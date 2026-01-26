@@ -28,6 +28,13 @@ button.secondary{background:#333}
 nav{display:flex;gap:6px;justify-content:space-around;background:#111;position:sticky;top:0;padding:6px}
 nav button{background:#222;font-size:14px}
 .small{color:var(--muted);font-size:13px}
+.region{
+  border:1px solid #2a2a2a;
+  padding:12px;
+  border-radius:12px;
+  margin-bottom:10px;
+}
+.owner{font-weight:bold}
 </style>
 </head>
 
@@ -71,15 +78,17 @@ nav button{background:#222;font-size:14px}
     <button onclick="tab('char')">👤</button>
     <button onclick="tab('club')">🏍️</button>
     <button onclick="tab('economy')">💰</button>
+    <button onclick="tab('map')">🗺️</button>
     <button onclick="go('settings')">⚙️</button>
   </nav>
 
   <div id="char" class="tab"></div>
   <div id="club" class="tab"></div>
   <div id="economy" class="tab"></div>
+  <div id="map" class="tab"></div>
 </section>
 
-<!-- SETTINGS (aus Schritt 1 unverändert) -->
+<!-- SETTINGS -->
 <section id="settings" class="screen">
   <h2>Einstellungen</h2>
   <button class="secondary" onclick="go('start')">Zurück</button>
@@ -97,16 +106,31 @@ function tab(id){
 }
 
 /* ===== STATE ===== */
-const SAVE_KEY="re_step2";
+const SAVE_KEY="re_step3";
 let chars=[];
 let current=null;
 
+const MCs=["Hells Angels","Bandidos","Gremium","Outlaws"];
+
+const REGIONS=[
+  {id:"berlin",name:"Berlin",owner:"Bandidos",economy:90,police:80},
+  {id:"brandenburg",name:"Brandenburg",owner:"Hells Angels",economy:60,police:60},
+  {id:"sachsen",name:"Sachsen",owner:"Neutral",economy:50,police:55},
+  {id:"nrw",name:"NRW",owner:"Gremium",economy:85,police:75}
+];
+
 /* ===== SAVE / LOAD ===== */
-function save(){localStorage.setItem(SAVE_KEY,JSON.stringify({chars}))}
+function save(){
+  localStorage.setItem(SAVE_KEY,JSON.stringify({chars,REGIONS}));
+}
 function load(){
   const d=localStorage.getItem(SAVE_KEY);
   if(!d)return;
-  chars=JSON.parse(d).chars||[];
+  const s=JSON.parse(d);
+  chars=s.chars||[];
+  if(s.REGIONS){
+    s.REGIONS.forEach((r,i)=>REGIONS[i].owner=r.owner);
+  }
 }
 
 /* ===== CHAR ===== */
@@ -120,7 +144,6 @@ function createChar(){
   });
   save(); renderChars(); go('chars');
 }
-
 function renderChars(){
   charList.innerHTML="";
   chars.forEach((c,i)=>{
@@ -130,7 +153,6 @@ function renderChars(){
     charList.appendChild(b);
   });
 }
-
 function startGame(i){
   current=i;
   renderGame();
@@ -146,14 +168,13 @@ function renderGame(){
   char.innerHTML=`
     <div class="card">
       Liga: ${p.liga}<br>
-      Status: ${p.members>=6?"Prospect-Club":"Einzelperson"}
+      Mitglieder: ${p.members}
     </div>
   `;
 
   club.innerHTML=`
     <div class="card">
-      Mitglieder: ${p.members}<br>
-      <button onclick="recruit()">Mitglied rekrutieren (300€)</button>
+      Clubstatus: ${p.members>=6?"Prospect-Club":"Einzelperson"}
     </div>
   `;
 
@@ -163,16 +184,18 @@ function renderGame(){
       <div class="small">Nur legale Einnahmen</div>
     </div>
   `;
-}
 
-/* ===== ACTIONS ===== */
-function recruit(){
-  const p=chars[current];
-  if(p.money<300)return alert("Zu wenig Geld");
-  p.money-=300;
-  p.members++;
-  p.income+=20;
-  save(); renderGame();
+  map.innerHTML="";
+  REGIONS.forEach(r=>{
+    map.innerHTML+=`
+      <div class="region">
+        <div class="owner">${r.name}</div>
+        Besitzer: ${r.owner}<br>
+        Wirtschaft: ${r.economy}%<br>
+        Polizei: ${r.police}%
+      </div>
+    `;
+  });
 }
 
 /* ===== INCOME LOOP ===== */
