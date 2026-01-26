@@ -7,33 +7,66 @@
 
 <style>
 :root{
-  --bg:#0e0e0e; --card:#1a1a1a; --accent:#b30000; --muted:#9aa0a6;
+  --bg:#0e0e0e;
+  --card:#1a1a1a;
+  --accent:#b30000;
+  --muted:#9aa0a6;
   --radius:14px;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial}
 body{margin:0;background:var(--bg);color:#fff}
 .screen{display:none;padding:16px}
 .screen.active{display:block}
-h1,h2{text-align:center;margin:10px 0}
-button{width:100%;padding:14px;margin:8px 0;background:var(--accent);color:#fff;border:none;border-radius:var(--radius)}
+h1,h2,h3{text-align:center;margin:10px 0}
+button{
+  width:100%;
+  padding:14px;
+  margin:8px 0;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius);
+  font-size:16px;
+}
 button.secondary{background:#333}
-.card{background:var(--card);padding:14px;border-radius:var(--radius);margin-bottom:12px}
-nav{display:flex;gap:6px;justify-content:space-around;background:#111;position:sticky;top:0;padding:6px}
+.card{
+  background:var(--card);
+  padding:14px;
+  border-radius:var(--radius);
+  margin-bottom:12px;
+}
+nav{
+  display:flex;
+  gap:6px;
+  justify-content:space-around;
+  background:#111;
+  position:sticky;
+  top:0;
+  padding:6px;
+}
 nav button{background:#222;font-size:14px}
 .small{color:var(--muted);font-size:13px}
-.region{border:1px solid #2a2a2a;padding:12px;border-radius:12px;margin-bottom:10px}
-.owner{font-weight:bold}
+.region{
+  border:1px solid #2a2a2a;
+  padding:12px;
+  border-radius:12px;
+  margin-bottom:10px;
+}
+.locked{opacity:.5}
+.hidden{display:none}
 </style>
 </head>
 
 <body>
 
+<!-- START -->
 <section id="start" class="screen active">
   <h1>🏍️ Rocker Empire</h1>
   <button onclick="go('chars')">Spielen</button>
   <button class="secondary" onclick="go('settings')">Einstellungen</button>
 </section>
 
+<!-- CHARAKTERE -->
 <section id="chars" class="screen">
   <h2>Charaktere</h2>
   <div id="charList"></div>
@@ -41,6 +74,7 @@ nav button{background:#222;font-size:14px}
   <button class="secondary" onclick="go('start')">Zurück</button>
 </section>
 
+<!-- CREATE -->
 <section id="create" class="screen">
   <h2>Neuer Charakter</h2>
   <div class="card">
@@ -52,29 +86,60 @@ nav button{background:#222;font-size:14px}
     <select id="mcSelect" class="hidden"></select>
     <button onclick="createChar()">Erstellen</button>
   </div>
+  <button class="secondary" onclick="go('chars')">Abbrechen</button>
 </section>
 
+<!-- GAME -->
 <section id="game" class="screen">
   <div class="card" id="hud"></div>
 
   <nav>
     <button onclick="tab('char')">👤</button>
-    <button onclick="tab('club')">🏍️</button>
     <button onclick="tab('map')">🗺️</button>
+    <button onclick="tab('market')">🏪</button>
     <button onclick="go('settings')">⚙️</button>
   </nav>
 
   <div id="char" class="tab"></div>
-  <div id="club" class="tab"></div>
   <div id="map" class="tab"></div>
+  <div id="market" class="tab"></div>
 </section>
 
+<!-- SETTINGS -->
 <section id="settings" class="screen">
   <h2>Einstellungen</h2>
+
+  <div class="card">
+    <h3>🎵 Musik</h3>
+    <select>
+      <option>An</option>
+      <option>Aus</option>
+    </select>
+    <input type="range" min="0" max="100" value="40">
+  </div>
+
+  <div class="card">
+    <h3>🎨 Grafik</h3>
+    <select>
+      <option>Low</option>
+      <option selected>Medium</option>
+      <option>High</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h3>🕹️ Optimierung</h3>
+    <select>
+      <option>Handy</option>
+      <option>PC</option>
+    </select>
+  </div>
+
   <button class="secondary" onclick="go('start')">Zurück</button>
 </section>
 
 <script>
+/* ========= NAV ========= */
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -84,38 +149,59 @@ function tab(id){
   document.getElementById(id).style.display="block";
 }
 
-const SAVE_KEY="re_step32";
+/* ========= DATEN ========= */
+const SAVE_KEY="rocker_empire_final";
+
+const LIGA1_MCS=[
+  "Hells Angels MC",
+  "Bandidos MC",
+  "Outlaws MC",
+  "Pagans MC",
+  "Sons of Silence"
+];
 
 const LIGA3_MCS=[
-  {name:"Bulldozer Cottbus", influence:"Hells Angels MC"},
-  {name:"Red Devils Support", influence:"Hells Angels MC"},
-  {name:"Support 81", influence:"Hells Angels MC"},
-  {name:"Free Riders", influence:"Neutral"},
-  {name:"Independent Brotherhood", influence:"Neutral"}
+  "Bulldozer Cottbus",
+  "Red Devils Support",
+  "Support 81",
+  "Free Riders",
+  "Independent Brotherhood"
 ];
 
 const REGIONS=[
-  {name:"Berlin", owner:"Bulldozer Cottbus", influence:"Hells Angels MC", econ:85, police:75},
-  {name:"Brandenburg", owner:"Red Devils Support", influence:"Hells Angels MC", econ:70, police:65},
-  {name:"Sachsen", owner:"Free Riders", influence:"Neutral", econ:55, police:55},
-  {name:"NRW", owner:"Independent Brotherhood", influence:"Gremium MC", econ:80, police:70}
+  {name:"Berlin", owner:"Hells Angels MC"},
+  {name:"Hamburg", owner:"Bandidos MC"},
+  {name:"NRW", owner:"Outlaws MC"},
+  {name:"Bayern", owner:"Pagans MC"},
+  {name:"Sachsen", owner:"Sons of Silence"},
+  {name:"Hessen", owner:"Hells Angels MC"},
+  {name:"Niedersachsen", owner:"Bandidos MC"},
+  {name:"Baden-Württemberg", owner:"Outlaws MC"}
 ];
 
-let chars=[], current=null;
+let chars=[];
+let current=null;
 
-function save(){localStorage.setItem(SAVE_KEY,JSON.stringify({chars}))}
-function load(){const d=localStorage.getItem(SAVE_KEY);if(d)chars=JSON.parse(d).chars||[]}
+/* ========= SAVE ========= */
+function save(){
+  localStorage.setItem(SAVE_KEY,JSON.stringify(chars));
+}
+function load(){
+  const d=localStorage.getItem(SAVE_KEY);
+  if(d) chars=JSON.parse(d);
+}
 
+/* ========= CREATE ========= */
 function updateCreateUI(){
   const liga=+ligaInput.value;
-  mcSelect.classList.toggle("hidden", liga===4);
   nameInput.disabled = liga!==4;
+  mcSelect.classList.toggle("hidden", liga===4);
 
   if(liga===3){
     mcSelect.innerHTML="";
     LIGA3_MCS.forEach(mc=>{
       const o=document.createElement("option");
-      o.textContent=mc.name;
+      o.textContent=mc;
       mcSelect.appendChild(o);
     });
   }
@@ -123,15 +209,16 @@ function updateCreateUI(){
 
 function createChar(){
   const liga=+ligaInput.value;
-  const mc = liga===3 ? mcSelect.value : "Eigenständig";
-  const name = liga===4 ? (nameInput.value||"Rider") : mc;
-
-  chars.push({
-    liga, name, mc,
-    money: liga===4?500:2000,
-    members: liga===4?1:6
-  });
-  save(); renderChars(); go('chars');
+  const c={
+    liga,
+    name: liga===4?(nameInput.value||"Rider"):mcSelect.value,
+    mc: liga===4?"Eigenständig":mcSelect.value,
+    influence: liga>=3?Math.floor(Math.random()*40)+20:0
+  };
+  chars.push(c);
+  save();
+  renderChars();
+  go('chars');
 }
 
 function renderChars(){
@@ -139,37 +226,78 @@ function renderChars(){
   chars.forEach((c,i)=>{
     const b=document.createElement("button");
     b.textContent=`${c.name} (Liga ${c.liga})`;
-    b.onclick=()=>{current=i;renderGame();go('game');tab('char')};
+    b.onclick=()=>startGame(i);
     charList.appendChild(b);
   });
 }
 
-function renderGame(){
-  const p=chars[current];
-  hud.innerHTML=`<strong>${p.name}</strong><br>${p.mc}`;
+function startGame(i){
+  current=i;
+  const p=chars[i];
+  hud.innerHTML=`
+    <strong>${p.name}</strong><br>
+    ${p.mc}<br>
+    Einfluss: ${p.influence}%
+  `;
+  renderChar(p);
+  renderMap(p);
+  renderMarket(p);
+  go('game');
+  tab('char');
+}
 
-  char.innerHTML=`Liga: ${p.liga}<br>Mitglieder: ${p.members}`;
+/* ========= UI ========= */
+function renderChar(p){
+  char.innerHTML=`
+    <div class="card">
+      Liga: ${p.liga}<br>
+      Club: ${p.mc}<br>
+      Einfluss: ${p.influence}%
+    </div>
+  `;
+}
 
-  club.innerHTML=`<div class="card">Club: <strong>${p.mc}</strong></div>`;
-
+function renderMap(p){
   map.innerHTML="";
   if(p.liga>=3){
     REGIONS.forEach(r=>{
       map.innerHTML+=`
         <div class="region">
-          <div class="owner">${r.name}</div>
+          <strong>${r.name}</strong><br>
           Besitzer: ${r.owner}<br>
-          Einfluss: ${r.influence}<br>
-          Wirtschaft: ${r.econ}%<br>
-          Polizei: ${r.police}%
-        </div>`;
+          Dein Einfluss: ${p.influence}%
+        </div>
+      `;
     });
   }else{
-    map.innerHTML=`<div class="card small">Regionen sind ab Liga 3 sichtbar.</div>`;
+    map.innerHTML=`<div class="card small">Regionen erst ab Liga 3 sichtbar</div>`;
   }
 }
 
-load(); updateCreateUI(); renderChars();
+function renderMarket(p){
+  let html="";
+  if(p.liga>=3){
+    html+=`
+      <div class="card ${p.influence<50?'locked':''}">
+        🔫 Waffenmarkt<br>
+        ${p.influence>=50?"Zugang möglich":"Kein Zugang – Einfluss zu gering"}
+      </div>
+      <div class="card">🌿 Biologische Drogen</div>
+    `;
+  }
+  if(p.liga>=2){
+    html+=`<div class="card">🧪 Chemische Drogen</div>`;
+  }
+  if(html===""){
+    html=`<div class="card small">Nur legale Geschäfte</div>`;
+  }
+  market.innerHTML=html;
+}
+
+/* ========= INIT ========= */
+load();
+renderChars();
+updateCreateUI();
 </script>
 
 </body>
