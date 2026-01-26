@@ -160,4 +160,86 @@ function renderAll(){
   const p=chars[current];
   hud.innerHTML=`
     <strong>${p.name}</strong><br>
-    ${p.mc}
+    ${p.mc}<br>
+    💶 ${p.money} € | 👥 ${p.members} | 🔫 ${p.weapons}
+  `;
+
+  char.innerHTML=`
+    <div class="card">
+      Liga ${p.liga}<br>
+      Einfluss ${p.influence}%<br>
+      Chapter: ${p.chapter?"Ja":"Nein"}
+    </div>
+  `;
+
+  map.innerHTML="";
+  if(p.liga>=3){
+    REGIONS.forEach((r,i)=>{
+      map.innerHTML+=`
+        <div class="region">
+          <strong>${r.name}</strong><br>
+          Besitzer: ${r.owner}<br>
+          <button onclick="attack(${i})">Angreifen</button>
+        </div>
+      `;
+    });
+  }
+
+  market.innerHTML=`
+    <div class="card ${p.influence<50?'locked':''}">
+      🔫 Waffen kaufen (1000 € / Stück)<br>
+      <button onclick="buyWeapon()">Kaufen</button>
+    </div>
+  `;
+
+  war.innerHTML=`
+    <div class="card">
+      Chapter kaufen (2000 €)<br>
+      <button onclick="buyChapter()">Chapter eröffnen</button>
+    </div>
+  `;
+}
+
+/* ===== ACTIONS ===== */
+function buyWeapon(){
+  const p=chars[current];
+  if(p.influence<50) return alert("Kein Zugriff");
+  if(p.money<1000) return alert("Zu wenig Geld");
+  p.money-=1000;
+  p.weapons++;
+  save(); renderAll();
+}
+
+function buyChapter(){
+  const p=chars[current];
+  if(p.liga<3) return alert("Nicht verfügbar");
+  if(p.members<6) return alert("Zu wenig Mitglieder");
+  if(p.money<2000) return alert("Zu wenig Geld");
+  p.money-=2000;
+  p.chapter=true;
+  save(); renderAll();
+}
+
+function attack(i){
+  const p=chars[current];
+  if(!p.chapter) return alert("Kein Chapter");
+  if(p.weapons<=0) return alert("Keine Waffen");
+  p.weapons--;
+
+  if(Math.random()<0.6){
+    p.influence=Math.min(100,p.influence+15);
+    alert("Angriff erfolgreich – Einfluss steigt");
+  }else{
+    p.influence=Math.max(0,p.influence-10);
+    p.members=Math.max(1,p.members-1);
+    alert("Angriff gescheitert");
+  }
+  save(); renderAll();
+}
+
+/* ===== INIT ===== */
+load(); renderChars(); updateCreateUI();
+</script>
+
+</body>
+</html>
