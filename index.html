@@ -1,12 +1,9 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rocker Empire</title>
-
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
 <style>
 :root{
@@ -14,39 +11,28 @@
   --radius:14px;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial}
-html,body{margin:0;background:var(--bg);color:#fff}
+body{margin:0;background:var(--bg);color:#fff}
 .screen{display:none;padding:16px}
 .screen.active{display:block}
 h1,h2,h3{text-align:center;margin:10px 0}
-button{
-  width:100%; padding:14px; margin:8px 0;
-  background:var(--accent); color:#fff; border:0; border-radius:var(--radius);
-  font-size:16px
-}
+button{width:100%;padding:14px;margin:8px 0;background:var(--accent);color:#fff;border:none;border-radius:var(--radius)}
 button.secondary{background:#333}
 .card{background:var(--card);padding:14px;border-radius:var(--radius);margin-bottom:12px}
 nav{display:flex;gap:6px;justify-content:space-around;background:#111;position:sticky;top:0;padding:6px}
 nav button{background:#222;font-size:14px}
 .small{color:var(--muted);font-size:13px}
-.region{
-  border:1px solid #2a2a2a;
-  padding:12px;
-  border-radius:12px;
-  margin-bottom:10px;
-}
+.region{border:1px solid #2a2a2a;padding:12px;border-radius:12px;margin-bottom:10px}
 .owner{font-weight:bold}
 </style>
 </head>
 
-<body class="touch medium">
+<body>
 
 <!-- START -->
 <section id="start" class="screen active">
   <h1>🏍️ Rocker Empire</h1>
-  <div class="card">
-    <button onclick="go('chars')">Spielen</button>
-    <button class="secondary" onclick="go('settings')">Einstellungen</button>
-  </div>
+  <button onclick="go('chars')">Spielen</button>
+  <button class="secondary" onclick="go('settings')">Einstellungen</button>
 </section>
 
 <!-- CHAR LIST -->
@@ -61,13 +47,17 @@ nav button{background:#222;font-size:14px}
 <section id="create" class="screen">
   <h2>Neuer Charakter</h2>
   <div class="card">
-    <input id="nameInput" placeholder="Name" />
-    <select id="ligaInput">
-      <option value="4">Liga 4 – Einzelgänger</option>
-      <option value="3">Liga 3 – Supporter</option>
+    <input id="nameInput" placeholder="Name (nur Liga 4)">
+    <select id="ligaInput" onchange="updateCreateUI()">
+      <option value="4">Liga 4 – Eigener Weg</option>
+      <option value="3">Liga 3 – Bestehender MC</option>
     </select>
+
+    <select id="mcSelect" class="hidden"></select>
+
     <button onclick="createChar()">Erstellen</button>
   </div>
+  <button class="secondary" onclick="go('chars')">Abbrechen</button>
 </section>
 
 <!-- GAME -->
@@ -77,20 +67,21 @@ nav button{background:#222;font-size:14px}
   <nav>
     <button onclick="tab('char')">👤</button>
     <button onclick="tab('club')">🏍️</button>
-    <button onclick="tab('economy')">💰</button>
     <button onclick="tab('map')">🗺️</button>
     <button onclick="go('settings')">⚙️</button>
   </nav>
 
   <div id="char" class="tab"></div>
   <div id="club" class="tab"></div>
-  <div id="economy" class="tab"></div>
   <div id="map" class="tab"></div>
 </section>
 
 <!-- SETTINGS -->
 <section id="settings" class="screen">
   <h2>Einstellungen</h2>
+  <div class="card">
+    <div class="small">Weitere Optionen folgen in späteren Schritten</div>
+  </div>
   <button class="secondary" onclick="go('start')">Zurück</button>
 </section>
 
@@ -105,108 +96,101 @@ function tab(id){
   document.getElementById(id).style.display="block";
 }
 
-/* ===== STATE ===== */
-const SAVE_KEY="re_step3";
-let chars=[];
-let current=null;
+/* ===== DATA ===== */
+const SAVE_KEY="re_step31";
 
-const MCs=["Hells Angels","Bandidos","Gremium","Outlaws"];
-
-const REGIONS=[
-  {id:"berlin",name:"Berlin",owner:"Bandidos",economy:90,police:80},
-  {id:"brandenburg",name:"Brandenburg",owner:"Hells Angels",economy:60,police:60},
-  {id:"sachsen",name:"Sachsen",owner:"Neutral",economy:50,police:55},
-  {id:"nrw",name:"NRW",owner:"Gremium",economy:85,police:75}
+const MCs=[
+  {name:"Hells Angels MC",influence:95},
+  {name:"Bandidos MC",influence:85},
+  {name:"Outlaws MC",influence:75},
+  {name:"Gremium MC",influence:70},
+  {name:"Red Devils MC",influence:55},
+  {name:"Bulldozer Cottbus",influence:45}
 ];
 
+const REGIONS=[
+  {name:"Berlin",owner:"Bandidos MC",econ:90,police:80},
+  {name:"Brandenburg",owner:"Hells Angels MC",econ:70,police:65},
+  {name:"Sachsen",owner:"Outlaws MC",econ:55,police:55},
+  {name:"NRW",owner:"Gremium MC",econ:85,police:75}
+];
+
+let chars=[], current=null;
+
 /* ===== SAVE / LOAD ===== */
-function save(){
-  localStorage.setItem(SAVE_KEY,JSON.stringify({chars,REGIONS}));
-}
+function save(){localStorage.setItem(SAVE_KEY,JSON.stringify({chars}))}
 function load(){
   const d=localStorage.getItem(SAVE_KEY);
   if(!d)return;
-  const s=JSON.parse(d);
-  chars=s.chars||[];
-  if(s.REGIONS){
-    s.REGIONS.forEach((r,i)=>REGIONS[i].owner=r.owner);
+  chars=JSON.parse(d).chars||[];
+}
+
+/* ===== CREATE LOGIC ===== */
+function updateCreateUI(){
+  const liga=+ligaInput.value;
+  mcSelect.classList.toggle("hidden", liga===4);
+  nameInput.disabled = liga!==4;
+
+  if(liga===3){
+    mcSelect.innerHTML="";
+    MCs.forEach(mc=>{
+      const o=document.createElement("option");
+      o.textContent=mc.name;
+      mcSelect.appendChild(o);
+    });
   }
 }
 
-/* ===== CHAR ===== */
 function createChar(){
-  chars.push({
-    name:nameInput.value||"Rider",
-    liga:+ligaInput.value,
-    money: ligaInput.value==4?500:2000,
-    members: ligaInput.value==4?1:6,
-    income: ligaInput.value==4?50:120
-  });
+  const liga=+ligaInput.value;
+  const c={
+    liga,
+    name: liga===4 ? (nameInput.value||"Rider") : mcSelect.value,
+    mc: liga===4 ? "Eigenständig" : mcSelect.value,
+    money: liga===4?500:2000,
+    members: liga===4?1:6
+  };
+  chars.push(c);
   save(); renderChars(); go('chars');
 }
+
 function renderChars(){
   charList.innerHTML="";
   chars.forEach((c,i)=>{
     const b=document.createElement("button");
     b.textContent=`${c.name} (Liga ${c.liga})`;
-    b.onclick=()=>startGame(i);
+    b.onclick=()=>{current=i;renderGame();go('game');tab('char')};
     charList.appendChild(b);
   });
-}
-function startGame(i){
-  current=i;
-  renderGame();
-  go('game');
-  tab('char');
 }
 
 /* ===== GAME UI ===== */
 function renderGame(){
   const p=chars[current];
-  hud.innerHTML=`<strong>${p.name}</strong><br>💶 ${p.money} €`;
+  hud.innerHTML=`<strong>${p.name}</strong><br>${p.mc}`;
 
-  char.innerHTML=`
-    <div class="card">
-      Liga: ${p.liga}<br>
-      Mitglieder: ${p.members}
-    </div>
-  `;
+  char.innerHTML=`Liga: ${p.liga}<br>Mitglieder: ${p.members}`;
 
-  club.innerHTML=`
-    <div class="card">
-      Clubstatus: ${p.members>=6?"Prospect-Club":"Einzelperson"}
-    </div>
-  `;
-
-  economy.innerHTML=`
-    <div class="card">
-      Einkommen: ${p.income} €/Minute<br>
-      <div class="small">Nur legale Einnahmen</div>
-    </div>
-  `;
+  club.innerHTML=`<div class="card">Club-Zugehörigkeit:<br><strong>${p.mc}</strong></div>`;
 
   map.innerHTML="";
-  REGIONS.forEach(r=>{
-    map.innerHTML+=`
-      <div class="region">
-        <div class="owner">${r.name}</div>
-        Besitzer: ${r.owner}<br>
-        Wirtschaft: ${r.economy}%<br>
-        Polizei: ${r.police}%
-      </div>
-    `;
-  });
+  if(p.liga>=3){
+    REGIONS.forEach(r=>{
+      map.innerHTML+=`
+        <div class="region">
+          <div class="owner">${r.name}</div>
+          Besitzer: ${r.owner}<br>
+          Wirtschaft: ${r.econ}%<br>
+          Polizei: ${r.police}%
+        </div>`;
+    });
+  }else{
+    map.innerHTML=`<div class="card small">Regionen sind ab Liga 3 sichtbar.</div>`;
+  }
 }
 
-/* ===== INCOME LOOP ===== */
-setInterval(()=>{
-  if(current===null)return;
-  chars[current].money+=chars[current].income;
-  save(); renderGame();
-},60000);
-
 /* ===== INIT ===== */
-load(); renderChars();
+load(); updateCreateUI(); renderChars();
 </script>
 </body>
 </html>
