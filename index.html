@@ -14,7 +14,7 @@
 body{margin:0;background:var(--bg);color:#fff}
 .screen{display:none;padding:16px}
 .screen.active{display:block}
-h1,h2,h3{text-align:center;margin:10px 0}
+h1,h2{text-align:center;margin:10px 0}
 button{width:100%;padding:14px;margin:8px 0;background:var(--accent);color:#fff;border:none;border-radius:var(--radius)}
 button.secondary{background:#333}
 .card{background:var(--card);padding:14px;border-radius:var(--radius);margin-bottom:12px}
@@ -28,14 +28,12 @@ nav button{background:#222;font-size:14px}
 
 <body>
 
-<!-- START -->
 <section id="start" class="screen active">
   <h1>🏍️ Rocker Empire</h1>
   <button onclick="go('chars')">Spielen</button>
   <button class="secondary" onclick="go('settings')">Einstellungen</button>
 </section>
 
-<!-- CHAR LIST -->
 <section id="chars" class="screen">
   <h2>Charaktere</h2>
   <div id="charList"></div>
@@ -43,24 +41,19 @@ nav button{background:#222;font-size:14px}
   <button class="secondary" onclick="go('start')">Zurück</button>
 </section>
 
-<!-- CREATE -->
 <section id="create" class="screen">
   <h2>Neuer Charakter</h2>
   <div class="card">
     <input id="nameInput" placeholder="Name (nur Liga 4)">
     <select id="ligaInput" onchange="updateCreateUI()">
       <option value="4">Liga 4 – Eigener Weg</option>
-      <option value="3">Liga 3 – Bestehender MC</option>
+      <option value="3">Liga 3 – Supporter-Club</option>
     </select>
-
     <select id="mcSelect" class="hidden"></select>
-
     <button onclick="createChar()">Erstellen</button>
   </div>
-  <button class="secondary" onclick="go('chars')">Abbrechen</button>
 </section>
 
-<!-- GAME -->
 <section id="game" class="screen">
   <div class="card" id="hud"></div>
 
@@ -76,17 +69,12 @@ nav button{background:#222;font-size:14px}
   <div id="map" class="tab"></div>
 </section>
 
-<!-- SETTINGS -->
 <section id="settings" class="screen">
   <h2>Einstellungen</h2>
-  <div class="card">
-    <div class="small">Weitere Optionen folgen in späteren Schritten</div>
-  </div>
   <button class="secondary" onclick="go('start')">Zurück</button>
 </section>
 
 <script>
-/* ===== NAV ===== */
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -96,36 +84,28 @@ function tab(id){
   document.getElementById(id).style.display="block";
 }
 
-/* ===== DATA ===== */
-const SAVE_KEY="re_step31";
+const SAVE_KEY="re_step32";
 
-const MCs=[
-  {name:"Hells Angels MC",influence:95},
-  {name:"Bandidos MC",influence:85},
-  {name:"Outlaws MC",influence:75},
-  {name:"Gremium MC",influence:70},
-  {name:"Red Devils MC",influence:55},
-  {name:"Bulldozer Cottbus",influence:45}
+const LIGA3_MCS=[
+  {name:"Bulldozer Cottbus", influence:"Hells Angels MC"},
+  {name:"Red Devils Support", influence:"Hells Angels MC"},
+  {name:"Support 81", influence:"Hells Angels MC"},
+  {name:"Free Riders", influence:"Neutral"},
+  {name:"Independent Brotherhood", influence:"Neutral"}
 ];
 
 const REGIONS=[
-  {name:"Berlin",owner:"Bandidos MC",econ:90,police:80},
-  {name:"Brandenburg",owner:"Hells Angels MC",econ:70,police:65},
-  {name:"Sachsen",owner:"Outlaws MC",econ:55,police:55},
-  {name:"NRW",owner:"Gremium MC",econ:85,police:75}
+  {name:"Berlin", owner:"Bulldozer Cottbus", influence:"Hells Angels MC", econ:85, police:75},
+  {name:"Brandenburg", owner:"Red Devils Support", influence:"Hells Angels MC", econ:70, police:65},
+  {name:"Sachsen", owner:"Free Riders", influence:"Neutral", econ:55, police:55},
+  {name:"NRW", owner:"Independent Brotherhood", influence:"Gremium MC", econ:80, police:70}
 ];
 
 let chars=[], current=null;
 
-/* ===== SAVE / LOAD ===== */
 function save(){localStorage.setItem(SAVE_KEY,JSON.stringify({chars}))}
-function load(){
-  const d=localStorage.getItem(SAVE_KEY);
-  if(!d)return;
-  chars=JSON.parse(d).chars||[];
-}
+function load(){const d=localStorage.getItem(SAVE_KEY);if(d)chars=JSON.parse(d).chars||[]}
 
-/* ===== CREATE LOGIC ===== */
 function updateCreateUI(){
   const liga=+ligaInput.value;
   mcSelect.classList.toggle("hidden", liga===4);
@@ -133,7 +113,7 @@ function updateCreateUI(){
 
   if(liga===3){
     mcSelect.innerHTML="";
-    MCs.forEach(mc=>{
+    LIGA3_MCS.forEach(mc=>{
       const o=document.createElement("option");
       o.textContent=mc.name;
       mcSelect.appendChild(o);
@@ -143,14 +123,14 @@ function updateCreateUI(){
 
 function createChar(){
   const liga=+ligaInput.value;
-  const c={
-    liga,
-    name: liga===4 ? (nameInput.value||"Rider") : mcSelect.value,
-    mc: liga===4 ? "Eigenständig" : mcSelect.value,
+  const mc = liga===3 ? mcSelect.value : "Eigenständig";
+  const name = liga===4 ? (nameInput.value||"Rider") : mc;
+
+  chars.push({
+    liga, name, mc,
     money: liga===4?500:2000,
     members: liga===4?1:6
-  };
-  chars.push(c);
+  });
   save(); renderChars(); go('chars');
 }
 
@@ -164,14 +144,13 @@ function renderChars(){
   });
 }
 
-/* ===== GAME UI ===== */
 function renderGame(){
   const p=chars[current];
   hud.innerHTML=`<strong>${p.name}</strong><br>${p.mc}`;
 
   char.innerHTML=`Liga: ${p.liga}<br>Mitglieder: ${p.members}`;
 
-  club.innerHTML=`<div class="card">Club-Zugehörigkeit:<br><strong>${p.mc}</strong></div>`;
+  club.innerHTML=`<div class="card">Club: <strong>${p.mc}</strong></div>`;
 
   map.innerHTML="";
   if(p.liga>=3){
@@ -180,6 +159,7 @@ function renderGame(){
         <div class="region">
           <div class="owner">${r.name}</div>
           Besitzer: ${r.owner}<br>
+          Einfluss: ${r.influence}<br>
           Wirtschaft: ${r.econ}%<br>
           Polizei: ${r.police}%
         </div>`;
@@ -189,8 +169,8 @@ function renderGame(){
   }
 }
 
-/* ===== INIT ===== */
 load(); updateCreateUI(); renderChars();
 </script>
+
 </body>
 </html>
