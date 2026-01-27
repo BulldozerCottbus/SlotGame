@@ -47,7 +47,7 @@ body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
   padding:14px;
   overflow-y:auto;
   transform:translateX(100%);
-  transition:transform .3s ease;
+  transition:.35s ease;
 }
 .panel.active{transform:translateX(0)}
 
@@ -64,7 +64,6 @@ body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
   border:none;
   color:#888;
   font-size:12px;
-  padding:6px 10px;
 }
 #bottomBar button.active{
   color:#fff;
@@ -92,7 +91,21 @@ button.secondary{background:#333}
   border-radius:10px;
   padding:10px;
   margin-bottom:10px;
+  cursor:pointer;
 }
+.bar{
+  height:8px;
+  background:#333;
+  border-radius:6px;
+  overflow:hidden;
+  margin-top:4px;
+}
+.bar > div{
+  height:100%;
+  background:var(--accent);
+}
+
+/* CENTER */
 .center{
   display:flex;
   flex-direction:column;
@@ -106,7 +119,7 @@ button.secondary{background:#333}
 .create-card input,
 .create-card select{
   width:100%;
-  padding:8px 10px;
+  padding:8px;
   border-radius:8px;
   border:none;
   background:#111;
@@ -167,6 +180,7 @@ button.secondary{background:#333}
     <div id="panel-map" class="panel"></div>
     <div id="panel-shop" class="panel"></div>
     <div id="panel-police" class="panel"></div>
+    <div id="panel-region" class="panel"></div>
   </div>
 
   <div id="bottomBar">
@@ -179,42 +193,42 @@ button.secondary{background:#333}
 
 <script>
 /* ======= TEIL 1 ENDET HIER ======= */
-/* NICHT SCHLIESSEN! WEITER MIT TEIL 2 */
-/* ================= TEIL 2: DATEN ================= */
+/* WEITER MIT TEIL 2 */
+/* ================= TEIL 2: DATEN & SYSTEME ================= */
 
-const SAVE_KEY = "rocker_empire_master_full";
+const SAVE_KEY = "rocker_empire_master_v8";
 
-/* -------- MCs & Loyalität -------- */
+/* ---------- MCs ---------- */
 const MCs = {
-  "Hells Angels MC": { loyalty: 40 },
-  "Bandidos MC": { loyalty: 35 },
-  "Outlaws MC": { loyalty: 30 },
-  "Pagans MC": { loyalty: 30 },
-  "Sons of Silence": { loyalty: 25 }
+  "Hells Angels MC": {},
+  "Bandidos MC": {},
+  "Outlaws MC": {},
+  "Pagans MC": {},
+  "Sons of Silence": {}
 };
 
-/* -------- Regionen (alle sichtbar) -------- */
+/* ---------- Regionen (alle anklickbar) ---------- */
 const REGIONS = [
-  { name: "Berlin", owner: "Hells Angels MC" },
-  { name: "Brandenburg", owner: "Hells Angels MC" },
-  { name: "Sachsen", owner: "Hells Angels MC" },
+  { name:"Berlin", owner:"Hells Angels MC" },
+  { name:"Brandenburg", owner:"Hells Angels MC" },
+  { name:"Sachsen", owner:"Hells Angels MC" },
 
-  { name: "Hamburg", owner: "Bandidos MC" },
-  { name: "Niedersachsen", owner: "Bandidos MC" },
-  { name: "Schleswig-Holstein", owner: "Bandidos MC" },
+  { name:"Hamburg", owner:"Bandidos MC" },
+  { name:"Niedersachsen", owner:"Bandidos MC" },
+  { name:"Schleswig-Holstein", owner:"Bandidos MC" },
 
-  { name: "NRW", owner: "Outlaws MC" },
-  { name: "Hessen", owner: "Outlaws MC" },
+  { name:"NRW", owner:"Outlaws MC" },
+  { name:"Hessen", owner:"Outlaws MC" },
 
-  { name: "Bayern", owner: "Pagans MC" },
-  { name: "Baden-Württemberg", owner: "Pagans MC" },
+  { name:"Bayern", owner:"Pagans MC" },
+  { name:"Baden-Württemberg", owner:"Pagans MC" },
 
-  { name: "Thüringen", owner: "Sons of Silence" },
-  { name: "Sachsen-Anhalt", owner: "Sons of Silence" },
-  { name: "Mecklenburg-Vorpommern", owner: "Sons of Silence" }
+  { name:"Thüringen", owner:"Sons of Silence" },
+  { name:"Sachsen-Anhalt", owner:"Sons of Silence" },
+  { name:"Mecklenburg-Vorpommern", owner:"Sons of Silence" }
 ];
 
-/* -------- Liga-3 Supporter-MCs -------- */
+/* ---------- Liga 3 Supporter ---------- */
 const LIGA3_MCS = [
   "Bulldozer Cottbus",
   "Red Devils Support",
@@ -223,67 +237,47 @@ const LIGA3_MCS = [
   "Independent Brotherhood"
 ];
 
-/* -------- Fahrzeuge -------- */
+/* ---------- Geschenk-System ---------- */
+const GIFTS = {
+  small: { min:1000, max:15000, gain:[1,3], cooldown:5 },
+  big: { min:30000, max:60000, gain:[5,8], cooldown:5 },
+  huge:{ min:90000, max:150000, gain:[9,11], cooldown:8 }
+};
+
+/* ---------- Fahrzeuge ---------- */
 const VEHICLES = [
-  {
-    name: "Schrottbike",
-    price: 5000,
-    speed: 20,
-    power: 15,
-    safety: 10,
-    freedom: 25
-  },
-  {
-    name: "Street Cruiser",
-    price: 25000,
-    speed: 40,
-    power: 35,
-    safety: 30,
-    freedom: 45
-  },
-  {
-    name: "Club Chopper",
-    price: 60000,
-    speed: 60,
-    power: 55,
-    safety: 50,
-    freedom: 65
-  },
-  {
-    name: "Elite Road King",
-    price: 100000,
-    speed: 80,
-    power: 75,
-    safety: 70,
-    freedom: 85
-  }
+  { name:"Schrottbike", price:5000, speed:20, power:15, safety:10, freedom:25 },
+  { name:"Street Cruiser", price:25000, speed:40, power:35, safety:30, freedom:45 },
+  { name:"Club Chopper", price:60000, speed:60, power:55, safety:50, freedom:65 },
+  { name:"Elite Road King", price:100000, speed:80, power:75, safety:70, freedom:85 }
 ];
 
-/* -------- Legale Shop-Items -------- */
+/* ---------- Legale Items ---------- */
 const LEGAL_ITEMS = [
-  { name: "Kleidung", price: 200, effect: "stability" },
-  { name: "Essen", price: 100, effect: "stability" },
-  { name: "Getränke", price: 80, effect: "stability" },
-  { name: "Verbandszeug", price: 150, effect: "safety" }
+  { name:"Kleidung", price:200 },
+  { name:"Essen", price:100 },
+  { name:"Getränke", price:80 },
+  { name:"Verbandszeug", price:150 }
 ];
 
-/* -------- Mitglieder -------- */
+/* ---------- Mitglieder ---------- */
 const MEMBERS = [
-  { name: "Prospect", price: 500, risk: 5 },
-  { name: "Club-Mitglied", price: 1500, risk: 10 },
-  { name: "Fremder MC", price: 800, risk: 25 }
+  { name:"Prospect", price:500, risk:5 },
+  { name:"Clubmitglied", price:1500, risk:10 },
+  { name:"Fremder MC", price:800, risk:25 }
 ];
 
-/* -------- Initialer Spielstate -------- */
+/* ---------- SPIELSTATE ---------- */
 let state = {
-  chars: []
+  chars:[]
 };
 
 let current = null;
+let selectedRegion = null;
 
 /* ================= TEIL 2 ENDET HIER ================= */
-/* WEITER MIT TEIL 3 – LOGIK & SPIELFUNKTIONEN */
-/* ================= TEIL 3: LOGIK ================= */
+/* WEITER MIT TEIL 3 – LOGIK & VERHALTEN */
+/* ================= TEIL 3: LOGIK & VERHALTEN ================= */
 
 /* ---------- Navigation ---------- */
 function go(id){
@@ -294,126 +288,143 @@ function openPanel(name){
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
   document.getElementById("panel-"+name).classList.add("active");
   document.querySelectorAll("#bottomBar button").forEach(b=>b.classList.remove("active"));
-  document.getElementById("btn-"+name).classList.add("active");
+  const btn=document.getElementById("btn-"+name); if(btn) btn.classList.add("active");
 }
 
 /* ---------- Save / Load ---------- */
-function save(){
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-}
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
 function load(){
-  const d = localStorage.getItem(SAVE_KEY);
-  if(d) state = JSON.parse(d);
+  const d=localStorage.getItem(SAVE_KEY);
+  if(d) state=JSON.parse(d);
+}
+
+/* ---------- Utils ---------- */
+const now=()=>Date.now();
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pct=(v)=>Math.max(0,Math.min(100,Math.round(v)));
+function cooldownLeft(ts,hrs){
+  if(!ts) return 0;
+  const ms=hrs*60*60*1000;
+  return Math.max(0, ms-(now()-ts));
+}
+function fmt(ms){
+  const s=Math.ceil(ms/1000);
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const r=s%60;
+  return (h?`${h}h `:"")+(m?`${m}m `:"")+`${r}s`;
 }
 
 /* ---------- Charakter-Erstellung ---------- */
 function updateCreateUI(){
-  mcSelect.style.display = ligaInput.value == 3 ? "block" : "none";
-  if(ligaInput.value == 3){
-    mcSelect.innerHTML = "";
-    LIGA3_MCS.forEach(m => mcSelect.innerHTML += `<option>${m}</option>`);
+  mcSelect.style.display = ligaInput.value==3 ? "block" : "none";
+  if(ligaInput.value==3){
+    mcSelect.innerHTML="";
+    LIGA3_MCS.forEach(m=>mcSelect.innerHTML+=`<option>${m}</option>`);
   }
 }
 function createChar(){
-  const liga = +ligaInput.value;
+  const liga=+ligaInput.value;
   state.chars.push({
     liga,
-    name: liga === 4 ? (nameInput.value || "Rider") : mcSelect.value,
-    mc: liga === 4 ? "Eigenständig" : mcSelect.value,
-    money: liga === 4 ? 500 : 2000,
-    members: liga === 4 ? 1 : 6,
-    influence: liga === 4 ? 0 : 20,
-    weapons: 0,
-    weed: 0,
-    heat: 0,
-    vehicle: null
+    name: liga===4 ? (nameInput.value||"Rider") : mcSelect.value,
+    mc: liga===4 ? "Eigenständig" : mcSelect.value,
+    money: liga===4?500:2000,
+    members: liga===4?1:6,
+    influence: liga===4?0:20,
+    weapons:0,
+    weed:0,
+    heat:0,
+    vehicle:null,
+    relations:{},              // { MC:{friend:%, lastReq, lastGift, lastVisit} }
+    lastAttack:{}              // { MC: timestamp }
   });
-  save();
-  renderChars();
-  go("chars");
+  save(); renderChars(); go("chars");
 }
 
-/* ---------- Charakter-Liste ---------- */
+/* ---------- Charakterliste ---------- */
 function renderChars(){
-  charList.innerHTML = "";
+  charList.innerHTML="";
   state.chars.forEach((c,i)=>{
-    charList.innerHTML += `<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
+    charList.innerHTML+=`<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
   });
 }
-
-/* ---------- Spielstart ---------- */
 function startGame(i){
-  current = i;
+  current=i;
   go("game");
   renderGame();
 }
 
 /* ---------- HUD & Panels ---------- */
 function renderGame(){
-  const p = state.chars[current];
+  const p=state.chars[current];
+  hudMoney.textContent=p.money;
+  hudMembers.textContent=p.members;
+  hudWeapons.textContent=p.weapons;
+  hudHeat.textContent="Heat "+p.heat+"%";
+  hudHeat.className="hud-heat "+(p.heat<40?"low":p.heat<70?"mid":"high");
 
-  hudMoney.textContent = p.money;
-  hudMembers.textContent = p.members;
-  hudWeapons.textContent = p.weapons;
-  hudHeat.textContent = "Heat " + p.heat + "%";
-  hudHeat.className = "hud-heat " + (p.heat<40?"low":p.heat<70?"mid":"high");
-
-  /* Charakter */
-  document.getElementById("panel-char").innerHTML = `
+  /* CHAR */
+  document.getElementById("panel-char").innerHTML=`
     <div class="card">
       <strong>${p.name}</strong><br>
       Liga ${p.liga}<br>
       Club: ${p.mc}<br>
       Einfluss: ${p.influence}%<br>
-      Fahrzeug: ${p.vehicle ? p.vehicle.name : "Keins"}
+      Fahrzeug: ${p.vehicle?p.vehicle.name:"Keins"}
     </div>
   `;
 
-  /* Map */
-  document.getElementById("panel-map").innerHTML = REGIONS.map(r=>`
-    <div class="region">
-      <strong>${r.name}</strong><br>
-      Besitzer: ${r.owner}<br>
-      Loyalität: ${MCs[r.owner].loyalty}%
-    </div>
-  `).join("");
+  /* MAP */
+  document.getElementById("panel-map").innerHTML=REGIONS.map((r,idx)=>{
+    const rel=p.relations[r.owner]||{friend:0};
+    return `
+      <div class="region" onclick="openRegion(${idx})">
+        <strong>${r.name}</strong><br>
+        Besitzer: ${r.owner}<br>
+        Freundschaft: ${pct(rel.friend||0)}%
+        <div class="bar"><div style="width:${pct(rel.friend||0)}%"></div></div>
+      </div>
+    `;
+  }).join("");
 
-  /* Shop */
-  document.getElementById("panel-shop").innerHTML = `
+  /* SHOP */
+  document.getElementById("panel-shop").innerHTML=`
     <div class="card">
-      <h3>Legale Items</h3>
-      ${LEGAL_ITEMS.map(i=>`
-        <button onclick="buyLegal(${i.price})">${i.name} – ${i.price}€</button>
-      `).join("")}
+      <h3>Legales</h3>
+      ${LEGAL_ITEMS.map(i=>`<button onclick="buyLegal(${i.price})">${i.name} – ${i.price}€</button>`).join("")}
     </div>
 
     <div class="card">
       <h3>Mitglieder</h3>
-      ${MEMBERS.map(m=>`
-        <button onclick="hireMember(${m.price},${m.risk})">${m.name} – ${m.price}€</button>
-      `).join("")}
+      ${MEMBERS.map(m=>`<button onclick="hireMember(${m.price},${m.risk})">${m.name} – ${m.price}€</button>`).join("")}
+    </div>
+
+    <div class="card">
+      <h3>Geschenke</h3>
+      <button onclick="buyGift('small')">🎁 Klein (1–3%)</button>
+      <button onclick="buyGift('big')">🎁 Groß (5–8%)</button>
+      <button onclick="buyGift('huge')">🎁 Big (9–11%)</button>
+      <small>Geschenke wirken im Orts-Panel</small>
     </div>
 
     <div class="card">
       <h3>Fahrzeuge</h3>
-      ${VEHICLES.map(v=>`
-        <button onclick="buyVehicle(${VEHICLES.indexOf(v)})">
+      ${VEHICLES.map((v,i)=>`
+        <button onclick="buyVehicle(${i})">
           ${v.name} – ${v.price}€<br>
           ⚡${v.speed}% 💪${v.power}% 🛡️${v.safety}% 🕊️${v.freedom}%
-        </button>
-      `).join("")}
+        </button>`).join("")}
     </div>
 
     <div class="card">
-      <h3>Illegales</h3>
-      ${Object.keys(MCs).map(mc=>`
-        <button onclick="buyWeapon('${mc}')">🔫 Waffe von ${mc}</button>
-      `).join("")}
+      <h3>Waffen</h3>
+      ${Object.keys(MCs).map(mc=>`<button onclick="buyWeapon('${mc}')">🔫 von ${mc}</button>`).join("")}
     </div>
   `;
 
-  /* Polizei */
-  document.getElementById("panel-police").innerHTML = `
+  /* POLICE */
+  document.getElementById("panel-police").innerHTML=`
     <div class="card">
       Heat: ${p.heat}%<br>
       <button onclick="bribePolice()">💸 Polizei schmieren</button>
@@ -421,51 +432,161 @@ function renderGame(){
   `;
 }
 
-/* ---------- Shop-Logik ---------- */
+/* ---------- Region Panel ---------- */
+function openRegion(idx){
+  selectedRegion=idx;
+  const r=REGIONS[idx];
+  const p=state.chars[current];
+  const rel=p.relations[r.owner]||{friend:0};
+  const leftReq=cooldownLeft(rel.lastReq,1);
+  const leftGiftSmall=cooldownLeft(rel.lastGiftSmall, GIFTS.small.cooldown);
+  const leftGiftBig=cooldownLeft(rel.lastGiftBig, GIFTS.big.cooldown);
+  const leftGiftHuge=cooldownLeft(rel.lastGiftHuge, GIFTS.huge.cooldown);
+  const leftVisit=cooldownLeft(rel.lastVisit,2);
+
+  document.getElementById("panel-region").innerHTML=`
+    <div class="card">
+      <strong>${r.name}</strong><br>
+      MC: ${r.owner}<br>
+      Freundschaft: ${pct(rel.friend||0)}%
+      <div class="bar"><div style="width:${pct(rel.friend||0)}%"></div></div>
+    </div>
+
+    <div class="card">
+      <h3>🤝 Freundschaft</h3>
+      <button ${leftReq?"disabled":""} onclick="requestFriend('${r.owner}')">
+        Anfrage ${leftReq?`(Cooldown ${fmt(leftReq)})`:""}
+      </button>
+    </div>
+
+    <div class="card">
+      <h3>🎁 Geschenke</h3>
+      <button ${leftGiftSmall?"disabled":""} onclick="giveGift('${r.owner}','small')">
+        Klein ${leftGiftSmall?`(${fmt(leftGiftSmall)})`:""}
+      </button>
+      <button ${leftGiftBig?"disabled":""} onclick="giveGift('${r.owner}','big')">
+        Groß ${leftGiftBig?`(${fmt(leftGiftBig)})`:""}
+      </button>
+      <button ${leftGiftHuge?"disabled":""} onclick="giveGift('${r.owner}','huge')">
+        Big ${leftGiftHuge?`(${fmt(leftGiftHuge)})`:""}
+      </button>
+    </div>
+
+    <div class="card">
+      <h3>🏍️ Besuch</h3>
+      <button ${ (rel.friend||0)<1 || leftVisit ? "disabled":"" } onclick="visitMC('${r.owner}')">
+        Besuch anfragen ${leftVisit?`(${fmt(leftVisit)})`:""}
+      </button>
+    </div>
+
+    <div class="card">
+      <h3>⚔️ Angriff</h3>
+      <button onclick="attackMC('${r.owner}')">Angreifen</button>
+    </div>
+
+    <button class="secondary" onclick="openPanel('map')">Schließen</button>
+  `;
+  openPanel('region');
+}
+
+/* ---------- Freundschaft ---------- */
+function ensureRel(p,mc){
+  if(!p.relations[mc]) p.relations[mc]={friend:0};
+  return p.relations[mc];
+}
+function requestFriend(mc){
+  const p=state.chars[current];
+  const rel=ensureRel(p,mc);
+  rel.lastReq=now();
+  if(Math.random()<0.2){
+    rel.friend=Math.max(rel.friend||0,1);
+    alert("Anfrage angenommen!");
+  }else{
+    rel.friend=pct((rel.friend||0)-1);
+    alert("Abgelehnt.");
+  }
+  save(); renderGame(); openRegion(selectedRegion);
+}
+function buyGift(type){
+  alert("Geschenk gekauft. Wähle einen Ort und übergib es dort.");
+}
+function giveGift(mc,type){
+  const p=state.chars[current];
+  const rel=ensureRel(p,mc);
+  const g=GIFTS[type];
+  const price=rnd(g.min,g.max);
+  if(p.money<price) return alert("Nicht genug Geld");
+  p.money-=price;
+  const inc=rnd(g.gain[0],g.gain[1]);
+  rel.friend=pct((rel.friend||0)+inc);
+  rel["lastGift"+type.charAt(0).toUpperCase()+type.slice(1)]=now();
+  save(); renderGame(); openRegion(selectedRegion);
+}
+
+/* ---------- Besuch ---------- */
+function visitMC(mc){
+  const p=state.chars[current];
+  const rel=ensureRel(p,mc);
+  rel.lastVisit=now();
+  const f=rel.friend||0;
+  const reject=Math.max(0.1, 1 - (f/100));
+  if(Math.random()<reject){
+    alert("Besuch abgelehnt.");
+  }else{
+    p.influence=pct(p.influence+2);
+    rel.friend=pct(rel.friend+1);
+    alert("Besuch erfolgreich.");
+  }
+  save(); renderGame(); openRegion(selectedRegion);
+}
+
+/* ---------- Angriff ---------- */
+function attackMC(mc){
+  const p=state.chars[current];
+  if(p.weapons<1) return alert("Keine Waffen!");
+  p.weapons--;
+  p.heat=pct(p.heat+15);
+  p.influence=pct(p.influence+5);
+  const rel=ensureRel(p,mc);
+  rel.friend=pct((rel.friend||0)-15);
+  p.lastAttack[mc]=now();
+  alert("Angriff durchgeführt. Gegenschlag möglich!");
+  save(); renderGame(); openRegion(selectedRegion);
+}
+
+/* ---------- Shop / Polizei ---------- */
 function buyLegal(price){
-  const p = state.chars[current];
-  if(p.money < price) return;
-  p.money -= price;
-  p.heat = Math.max(0, p.heat - 2);
+  const p=state.chars[current];
+  if(p.money<price) return;
+  p.money-=price;
+  p.heat=pct(p.heat-2);
   save(); renderGame();
 }
-
 function hireMember(price,risk){
-  const p = state.chars[current];
-  if(p.money < price) return;
-  p.money -= price;
-  p.members++;
-  p.heat += risk;
+  const p=state.chars[current];
+  if(p.money<price) return;
+  p.money-=price; p.members++; p.heat=pct(p.heat+risk);
   save(); renderGame();
 }
-
-function buyVehicle(index){
-  const p = state.chars[current];
-  const v = VEHICLES[index];
-  if(p.money < v.price) return;
-  p.money -= v.price;
-  p.vehicle = v;
+function buyVehicle(i){
+  const p=state.chars[current], v=VEHICLES[i];
+  if(p.money<v.price) return;
+  p.money-=v.price; p.vehicle=v;
   save(); renderGame();
 }
-
 function buyWeapon(mc){
-  const p = state.chars[current];
-  if(MCs[mc].loyalty < 50) return alert("Kein Vertrauen von "+mc);
-  if(p.money < 1000) return;
-  p.money -= 1000;
-  p.weapons++;
-  p.heat += 8;
-  MCs[mc].loyalty += 2;
+  const p=state.chars[current];
+  const rel=ensureRel(p,mc);
+  if((rel.friend||0)<50) return alert("Kein Vertrauen");
+  if(p.money<1000) return;
+  p.money-=1000; p.weapons++; p.heat=pct(p.heat+8);
   save(); renderGame();
 }
-
-/* ---------- Polizei ---------- */
 function bribePolice(){
-  const p = state.chars[current];
-  const cost = p.liga === 4 ? 1000 : 3000;
-  if(p.money < cost) return;
-  p.money -= cost;
-  p.heat = Math.max(0, p.heat - 25);
+  const p=state.chars[current];
+  const cost=p.liga===4?1000:3000;
+  if(p.money<cost) return;
+  p.money-=cost; p.heat=pct(p.heat-25);
   save(); renderGame();
 }
 
@@ -473,7 +594,7 @@ function bribePolice(){
 load();
 renderChars();
 
-/* ================= TEIL 3 ENDET HIER ================= */
+/* ================= ENDE ================= */
 </script>
 </body>
 </html>
