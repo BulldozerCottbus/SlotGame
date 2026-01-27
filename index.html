@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rocker Empire</title>
 
 <style>
-/* ================= CORE ================= */
 :root{
   --bg:#0b0b0b;
   --panel:#151515;
-  --card:#1d1d1d;
+  --card:#1e1e1e;
   --accent:#b30000;
   --good:#2ecc71;
   --warn:#f1c40f;
@@ -20,114 +19,106 @@
 *{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont}
 body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
 
-/* ================= SCREENS ================= */
+/* Screens */
 .screen{display:none;height:100vh;width:100vw}
 .screen.active{display:flex;flex-direction:column}
 
-/* ================= HUD ================= */
+/* HUD */
 #hud{
-  background:linear-gradient(180deg,#111,#0b0b0b);
-  padding:10px 14px;
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  padding:8px 12px;
+  background:#111;
   border-bottom:1px solid #222;
+  font-size:14px;
 }
-.hud-item{font-size:14px}
-.hud-heat{font-weight:700}
 .hud-heat.low{color:var(--good)}
 .hud-heat.mid{color:var(--warn)}
 .hud-heat.high{color:var(--bad);animation:pulse 1s infinite}
+@keyframes pulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
 
-@keyframes pulse{
-  0%{opacity:1}50%{opacity:.6}100%{opacity:1}
-}
-
-/* ================= CONTENT ================= */
-#content{
-  flex:1;
-  position:relative;
-  overflow:hidden;
-}
+/* Content */
+#content{flex:1;position:relative;overflow:hidden}
 .panel{
   position:absolute;
   inset:0;
   background:var(--panel);
-  transform:translateX(100%);
-  transition:.35s ease;
-  overflow-y:auto;
   padding:14px;
+  overflow-y:auto;
+  transform:translateX(100%);
+  transition:transform .3s ease;
 }
 .panel.active{transform:translateX(0)}
 
-/* ================= BOTTOM BAR ================= */
+/* Bottom Bar */
 #bottomBar{
-  background:#111;
-  border-top:1px solid #222;
   display:flex;
   justify-content:space-around;
+  background:#111;
+  border-top:1px solid #222;
   padding:6px 0;
 }
 #bottomBar button{
   background:none;
   border:none;
-  color:#aaa;
-  font-size:13px;
+  color:#888;
+  font-size:12px;
+  padding:6px 10px;
 }
-#bottomBar button.active{color:#fff}
+#bottomBar button.active{
+  color:#fff;
+  border-bottom:2px solid var(--accent);
+}
 
-/* ================= CARDS ================= */
+/* UI Elements */
+button{
+  background:var(--accent);
+  border:none;
+  color:#fff;
+  padding:10px;
+  border-radius:8px;
+  margin-top:6px;
+}
 .card{
   background:var(--card);
-  border-radius:12px;
+  border-radius:10px;
   padding:12px;
   margin-bottom:12px;
 }
 .region{
-  padding:12px;
   border:1px solid #333;
   border-radius:10px;
+  padding:10px;
   margin-bottom:10px;
 }
-button{
-  width:100%;
-  background:var(--accent);
-  color:#fff;
-  border:none;
-  padding:12px;
-  border-radius:10px;
-  margin-top:6px;
-}
-
-/* ================= START / MENU ================= */
 .center{
   display:flex;
   flex-direction:column;
   justify-content:center;
   align-items:center;
   height:100%;
-  padding:20px;
 }
-.big-btn{font-size:18px;padding:16px}
-
-/* ================= ANIM NUMBERS ================= */
-.anim{
-  transition:all .3s ease;
+input,select{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+  margin-bottom:10px;
 }
 </style>
 </head>
 
 <body>
 
-<!-- ================= START ================= -->
+<!-- START -->
 <section id="start" class="screen active">
   <div class="center">
     <h1>🏍️ ROCKER EMPIRE</h1>
-    <button class="big-btn" onclick="go('chars')">SPIELEN</button>
+    <button onclick="go('chars')">SPIELEN</button>
   </div>
 </section>
 
-<!-- ================= CHAR SELECT ================= -->
+<!-- CHARACTERS -->
 <section id="chars" class="screen">
   <div class="center">
     <h2>Charaktere</h2>
@@ -137,14 +128,14 @@ button{
   </div>
 </section>
 
-<!-- ================= CREATE ================= -->
+<!-- CREATE -->
 <section id="create" class="screen">
   <div class="center">
     <h2>Neuer Charakter</h2>
-    <input id="nameInput" placeholder="Name (Liga 4)" />
+    <input id="nameInput" placeholder="Name (Liga 4)">
     <select id="ligaInput" onchange="updateCreateUI()">
-      <option value="4">Liga 4 – Eigenständig</option>
-      <option value="3">Liga 3 – Supporter</option>
+      <option value="4">Liga 4</option>
+      <option value="3">Liga 3</option>
     </select>
     <select id="mcSelect" style="display:none"></select>
     <button onclick="createChar()">Erstellen</button>
@@ -152,46 +143,35 @@ button{
   </div>
 </section>
 
-<!-- ================= GAME ================= -->
+<!-- GAME -->
 <section id="game" class="screen">
 
-  <!-- HUD -->
   <div id="hud">
-    <div class="hud-item">💶 <span id="hudMoney">0</span></div>
-    <div class="hud-item">👥 <span id="hudMembers">0</span></div>
-    <div class="hud-item">🔫 <span id="hudWeapons">0</span></div>
-    <div class="hud-item hud-heat low" id="hudHeat">Heat 0%</div>
+    <div>💶 <span id="hudMoney">0</span></div>
+    <div>👥 <span id="hudMembers">0</span></div>
+    <div>🔫 <span id="hudWeapons">0</span></div>
+    <div id="hudHeat" class="hud-heat low">Heat 0%</div>
   </div>
 
-  <!-- CONTENT -->
   <div id="content">
-
-    <!-- CHAR -->
     <div id="panel-char" class="panel active"></div>
-
-    <!-- MAP -->
     <div id="panel-map" class="panel"></div>
-
-    <!-- SHOP -->
     <div id="panel-shop" class="panel"></div>
-
-    <!-- POLICE -->
     <div id="panel-police" class="panel"></div>
-
   </div>
 
-  <!-- BOTTOM BAR -->
   <div id="bottomBar">
-    <button onclick="openPanel('char')" class="active">👤</button>
-    <button onclick="openPanel('map')">🗺️</button>
-    <button onclick="openPanel('shop')">🏪</button>
-    <button onclick="openPanel('police')">🚓</button>
+    <button id="btn-char" class="active" onclick="openPanel('char')">👤</button>
+    <button id="btn-map" onclick="openPanel('map')">🗺️</button>
+    <button id="btn-shop" onclick="openPanel('shop')">🏪</button>
+    <button id="btn-police" onclick="openPanel('police')">🚓</button>
   </div>
+
 </section>
 
 <script>
-/* ================= DATA ================= */
-const SAVE_KEY="rocker_empire_ui_v1";
+/* DATA */
+const SAVE_KEY="rocker_empire_ui_v11";
 
 const MCs={
   "Hells Angels MC":{loyalty:40},
@@ -200,7 +180,6 @@ const MCs={
   "Pagans MC":{loyalty:30},
   "Sons of Silence":{loyalty:25}
 };
-
 const REGIONS=[
   {name:"Berlin",owner:"Hells Angels MC"},
   {name:"Hamburg",owner:"Bandidos MC"},
@@ -208,13 +187,12 @@ const REGIONS=[
   {name:"Bayern",owner:"Pagans MC"},
   {name:"Sachsen",owner:"Sons of Silence"}
 ];
-
 const LIGA3_MCS=["Bulldozer Cottbus","Red Devils Support"];
 
 let state={chars:[]};
 let current=null;
 
-/* ================= NAV ================= */
+/* NAV */
 function go(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -223,14 +201,14 @@ function openPanel(name){
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
   document.getElementById("panel-"+name).classList.add("active");
   document.querySelectorAll("#bottomBar button").forEach(b=>b.classList.remove("active"));
-  event.target.classList.add("active");
+  document.getElementById("btn-"+name).classList.add("active");
 }
 
-/* ================= SAVE ================= */
+/* SAVE */
 function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(state))}
 function load(){const d=localStorage.getItem(SAVE_KEY);if(d)state=JSON.parse(d)}
 
-/* ================= CREATE ================= */
+/* CREATE */
 function updateCreateUI(){
   mcSelect.style.display=ligaInput.value==3?"block":"none";
   if(ligaInput.value==3){
@@ -248,17 +226,16 @@ function createChar(){
     members:liga==4?1:6,
     influence:liga==4?0:20,
     weapons:0,
-    weed:0,
     heat:0
   });
   save();renderChars();go("chars");
 }
 
-/* ================= UI ================= */
+/* UI */
 function renderChars(){
   charList.innerHTML="";
   state.chars.forEach((c,i)=>{
-    charList.innerHTML+=`<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
+    charList.innerHTML+=`<button onclick="startGame(${i})">${c.name}</button>`;
   });
 }
 function startGame(i){
@@ -268,15 +245,13 @@ function startGame(i){
 }
 function renderGame(){
   const p=state.chars[current];
-
   hudMoney.textContent=p.money;
   hudMembers.textContent=p.members;
   hudWeapons.textContent=p.weapons;
-
   hudHeat.textContent="Heat "+p.heat+"%";
-  hudHeat.className="hud-item hud-heat "+(p.heat<40?"low":p.heat<70?"mid":"high");
+  hudHeat.className="hud-heat "+(p.heat<40?"low":p.heat<70?"mid":"high");
 
-  panelChar.innerHTML=`
+  document.getElementById("panel-char").innerHTML=`
     <div class="card">
       <strong>${p.name}</strong><br>
       Liga ${p.liga}<br>
@@ -285,28 +260,24 @@ function renderGame(){
     </div>
   `;
 
-  panelMap.innerHTML="";
-  REGIONS.forEach(r=>{
-    panelMap.innerHTML+=`
-      <div class="region">
-        <strong>${r.name}</strong><br>
-        Besitzer: ${r.owner}<br>
-        Loyalität: ${MCs[r.owner].loyalty}%
-      </div>`;
-  });
+  document.getElementById("panel-map").innerHTML=REGIONS.map(r=>`
+    <div class="region">
+      <strong>${r.name}</strong><br>
+      Besitzer: ${r.owner}<br>
+      Loyalität: ${MCs[r.owner].loyalty}%
+    </div>
+  `).join("");
 
-  panelShop.innerHTML="";
-  Object.keys(MCs).forEach(mc=>{
-    panelShop.innerHTML+=`
-      <div class="card">
-        <strong>${mc}</strong><br>
-        Loyalität: ${MCs[mc].loyalty}%<br>
-        <button onclick="buyWeed('${mc}')">🌿 Gras kaufen (500 €)</button>
-        <button onclick="buyWeapon('${mc}')">🔫 Waffe kaufen (1000 €)</button>
-      </div>`;
-  });
+  document.getElementById("panel-shop").innerHTML=Object.keys(MCs).map(mc=>`
+    <div class="card">
+      <strong>${mc}</strong><br>
+      Loyalität: ${MCs[mc].loyalty}%<br>
+      <button onclick="buyWeed('${mc}')">🌿 Gras kaufen</button>
+      <button onclick="buyWeapon('${mc}')">🔫 Waffe kaufen</button>
+    </div>
+  `).join("");
 
-  panelPolice.innerHTML=`
+  document.getElementById("panel-police").innerHTML=`
     <div class="card">
       Heat: ${p.heat}%<br>
       <button onclick="bribe()">💸 Polizei schmieren</button>
@@ -314,16 +285,16 @@ function renderGame(){
   `;
 }
 
-/* ================= ACTIONS ================= */
+/* ACTIONS */
 function buyWeed(mc){
   const p=state.chars[current];
   if(p.money<500)return;
-  p.money-=500;p.weed++;p.heat+=5;MCs[mc].loyalty+=3;
+  p.money-=500;p.heat+=5;MCs[mc].loyalty+=3;
   save();renderGame();
 }
 function buyWeapon(mc){
   const p=state.chars[current];
-  if(MCs[mc].loyalty<50||p.money<1000)return;
+  if(p.money<1000||MCs[mc].loyalty<50)return;
   p.money-=1000;p.weapons++;p.heat+=8;MCs[mc].loyalty+=2;
   save();renderGame();
 }
@@ -335,7 +306,7 @@ function bribe(){
   save();renderGame();
 }
 
-/* ================= INIT ================= */
+/* INIT */
 load();
 renderChars();
 </script>
