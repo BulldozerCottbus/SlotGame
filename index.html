@@ -19,7 +19,7 @@
 *{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont}
 body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
 
-/* Screens */
+/* SCREENS */
 .screen{display:none;height:100vh;width:100vw}
 .screen.active{display:flex;flex-direction:column}
 
@@ -38,7 +38,7 @@ body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
 .hud-heat.high{color:var(--bad);animation:pulse 1s infinite}
 @keyframes pulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
 
-/* Content */
+/* CONTENT */
 #content{flex:1;position:relative;overflow:hidden}
 .panel{
   position:absolute;
@@ -51,7 +51,7 @@ body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
 }
 .panel.active{transform:translateX(0)}
 
-/* Bottom Bar */
+/* BOTTOM BAR */
 #bottomBar{
   display:flex;
   justify-content:space-around;
@@ -101,7 +101,7 @@ button.secondary{background:#333}
   height:100%;
 }
 
-/* Create */
+/* CREATE */
 .create-card{width:100%;max-width:320px}
 .create-card input,
 .create-card select{
@@ -178,27 +178,44 @@ button.secondary{background:#333}
 </section>
 
 <script>
-/* ================= DATA ================= */
-const SAVE_KEY="rocker_empire_master_ui";
+/* ======= TEIL 1 ENDET HIER ======= */
+/* NICHT SCHLIESSEN! WEITER MIT TEIL 2 */
+/* ================= TEIL 2: DATEN ================= */
 
-const MCs={
-  "Hells Angels MC":{loyalty:40},
-  "Bandidos MC":{loyalty:35},
-  "Outlaws MC":{loyalty:30},
-  "Pagans MC":{loyalty:30},
-  "Sons of Silence":{loyalty:25}
+const SAVE_KEY = "rocker_empire_master_full";
+
+/* -------- MCs & Loyalität -------- */
+const MCs = {
+  "Hells Angels MC": { loyalty: 40 },
+  "Bandidos MC": { loyalty: 35 },
+  "Outlaws MC": { loyalty: 30 },
+  "Pagans MC": { loyalty: 30 },
+  "Sons of Silence": { loyalty: 25 }
 };
 
-const REGIONS=[
-  {name:"Berlin",owner:"Hells Angels MC"},
-  {name:"Brandenburg",owner:"Hells Angels MC"},
-  {name:"Hamburg",owner:"Bandidos MC"},
-  {name:"NRW",owner:"Outlaws MC"},
-  {name:"Bayern",owner:"Pagans MC"},
-  {name:"Sachsen",owner:"Sons of Silence"}
+/* -------- Regionen (alle sichtbar) -------- */
+const REGIONS = [
+  { name: "Berlin", owner: "Hells Angels MC" },
+  { name: "Brandenburg", owner: "Hells Angels MC" },
+  { name: "Sachsen", owner: "Hells Angels MC" },
+
+  { name: "Hamburg", owner: "Bandidos MC" },
+  { name: "Niedersachsen", owner: "Bandidos MC" },
+  { name: "Schleswig-Holstein", owner: "Bandidos MC" },
+
+  { name: "NRW", owner: "Outlaws MC" },
+  { name: "Hessen", owner: "Outlaws MC" },
+
+  { name: "Bayern", owner: "Pagans MC" },
+  { name: "Baden-Württemberg", owner: "Pagans MC" },
+
+  { name: "Thüringen", owner: "Sons of Silence" },
+  { name: "Sachsen-Anhalt", owner: "Sons of Silence" },
+  { name: "Mecklenburg-Vorpommern", owner: "Sons of Silence" }
 ];
 
-const LIGA3_MCS=[
+/* -------- Liga-3 Supporter-MCs -------- */
+const LIGA3_MCS = [
   "Bulldozer Cottbus",
   "Red Devils Support",
   "Support 81",
@@ -206,10 +223,69 @@ const LIGA3_MCS=[
   "Independent Brotherhood"
 ];
 
-let state={chars:[]};
-let current=null;
+/* -------- Fahrzeuge -------- */
+const VEHICLES = [
+  {
+    name: "Schrottbike",
+    price: 5000,
+    speed: 20,
+    power: 15,
+    safety: 10,
+    freedom: 25
+  },
+  {
+    name: "Street Cruiser",
+    price: 25000,
+    speed: 40,
+    power: 35,
+    safety: 30,
+    freedom: 45
+  },
+  {
+    name: "Club Chopper",
+    price: 60000,
+    speed: 60,
+    power: 55,
+    safety: 50,
+    freedom: 65
+  },
+  {
+    name: "Elite Road King",
+    price: 100000,
+    speed: 80,
+    power: 75,
+    safety: 70,
+    freedom: 85
+  }
+];
 
-/* ================= NAV ================= */
+/* -------- Legale Shop-Items -------- */
+const LEGAL_ITEMS = [
+  { name: "Kleidung", price: 200, effect: "stability" },
+  { name: "Essen", price: 100, effect: "stability" },
+  { name: "Getränke", price: 80, effect: "stability" },
+  { name: "Verbandszeug", price: 150, effect: "safety" }
+];
+
+/* -------- Mitglieder -------- */
+const MEMBERS = [
+  { name: "Prospect", price: 500, risk: 5 },
+  { name: "Club-Mitglied", price: 1500, risk: 10 },
+  { name: "Fremder MC", price: 800, risk: 25 }
+];
+
+/* -------- Initialer Spielstate -------- */
+let state = {
+  chars: []
+};
+
+let current = null;
+
+/* ================= TEIL 2 ENDET HIER ================= */
+/* WEITER MIT TEIL 3 – LOGIK & SPIELFUNKTIONEN */
+/* ================= TEIL 3: LOGIK ================= */
+
+/* ---------- Navigation ---------- */
 function go(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -221,64 +297,80 @@ function openPanel(name){
   document.getElementById("btn-"+name).classList.add("active");
 }
 
-/* ================= SAVE ================= */
-function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(state))}
-function load(){const d=localStorage.getItem(SAVE_KEY);if(d)state=JSON.parse(d)}
+/* ---------- Save / Load ---------- */
+function save(){
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+function load(){
+  const d = localStorage.getItem(SAVE_KEY);
+  if(d) state = JSON.parse(d);
+}
 
-/* ================= CREATE ================= */
+/* ---------- Charakter-Erstellung ---------- */
 function updateCreateUI(){
-  mcSelect.style.display=ligaInput.value==3?"block":"none";
-  if(ligaInput.value==3){
-    mcSelect.innerHTML="";
-    LIGA3_MCS.forEach(m=>mcSelect.innerHTML+=`<option>${m}</option>`);
+  mcSelect.style.display = ligaInput.value == 3 ? "block" : "none";
+  if(ligaInput.value == 3){
+    mcSelect.innerHTML = "";
+    LIGA3_MCS.forEach(m => mcSelect.innerHTML += `<option>${m}</option>`);
   }
 }
 function createChar(){
-  const liga=+ligaInput.value;
+  const liga = +ligaInput.value;
   state.chars.push({
     liga,
-    name:liga===4?(nameInput.value||"Rider"):mcSelect.value,
-    mc:liga===4?"Eigenständig":mcSelect.value,
-    money:liga===4?500:2000,
-    members:liga===4?1:6,
-    influence:liga===4?0:20,
-    weapons:0,
-    weed:0,
-    heat:0
+    name: liga === 4 ? (nameInput.value || "Rider") : mcSelect.value,
+    mc: liga === 4 ? "Eigenständig" : mcSelect.value,
+    money: liga === 4 ? 500 : 2000,
+    members: liga === 4 ? 1 : 6,
+    influence: liga === 4 ? 0 : 20,
+    weapons: 0,
+    weed: 0,
+    heat: 0,
+    vehicle: null
   });
-  save();renderChars();go("chars");
+  save();
+  renderChars();
+  go("chars");
 }
 
-/* ================= UI ================= */
+/* ---------- Charakter-Liste ---------- */
 function renderChars(){
-  charList.innerHTML="";
+  charList.innerHTML = "";
   state.chars.forEach((c,i)=>{
-    charList.innerHTML+=`<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
+    charList.innerHTML += `<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
   });
 }
+
+/* ---------- Spielstart ---------- */
 function startGame(i){
-  current=i;
+  current = i;
   go("game");
   renderGame();
 }
-function renderGame(){
-  const p=state.chars[current];
-  hudMoney.textContent=p.money;
-  hudMembers.textContent=p.members;
-  hudWeapons.textContent=p.weapons;
-  hudHeat.textContent="Heat "+p.heat+"%";
-  hudHeat.className="hud-heat "+(p.heat<40?"low":p.heat<70?"mid":"high");
 
-  document.getElementById("panel-char").innerHTML=`
+/* ---------- HUD & Panels ---------- */
+function renderGame(){
+  const p = state.chars[current];
+
+  hudMoney.textContent = p.money;
+  hudMembers.textContent = p.members;
+  hudWeapons.textContent = p.weapons;
+  hudHeat.textContent = "Heat " + p.heat + "%";
+  hudHeat.className = "hud-heat " + (p.heat<40?"low":p.heat<70?"mid":"high");
+
+  /* Charakter */
+  document.getElementById("panel-char").innerHTML = `
     <div class="card">
       <strong>${p.name}</strong><br>
       Liga ${p.liga}<br>
       Club: ${p.mc}<br>
-      Einfluss: ${p.influence}%
+      Einfluss: ${p.influence}%<br>
+      Fahrzeug: ${p.vehicle ? p.vehicle.name : "Keins"}
     </div>
   `;
 
-  document.getElementById("panel-map").innerHTML=REGIONS.map(r=>`
+  /* Map */
+  document.getElementById("panel-map").innerHTML = REGIONS.map(r=>`
     <div class="region">
       <strong>${r.name}</strong><br>
       Besitzer: ${r.owner}<br>
@@ -286,48 +378,102 @@ function renderGame(){
     </div>
   `).join("");
 
-  document.getElementById("panel-shop").innerHTML=Object.keys(MCs).map(mc=>`
+  /* Shop */
+  document.getElementById("panel-shop").innerHTML = `
     <div class="card">
-      <strong>${mc}</strong><br>
-      Loyalität: ${MCs[mc].loyalty}%<br>
-      <button onclick="buyWeed('${mc}')">🌿 Gras kaufen (500 €)</button>
-      <button onclick="buyWeapon('${mc}')">🔫 Waffe kaufen (1000 €)</button>
+      <h3>Legale Items</h3>
+      ${LEGAL_ITEMS.map(i=>`
+        <button onclick="buyLegal(${i.price})">${i.name} – ${i.price}€</button>
+      `).join("")}
     </div>
-  `).join("");
 
-  document.getElementById("panel-police").innerHTML=`
+    <div class="card">
+      <h3>Mitglieder</h3>
+      ${MEMBERS.map(m=>`
+        <button onclick="hireMember(${m.price},${m.risk})">${m.name} – ${m.price}€</button>
+      `).join("")}
+    </div>
+
+    <div class="card">
+      <h3>Fahrzeuge</h3>
+      ${VEHICLES.map(v=>`
+        <button onclick="buyVehicle(${VEHICLES.indexOf(v)})">
+          ${v.name} – ${v.price}€<br>
+          ⚡${v.speed}% 💪${v.power}% 🛡️${v.safety}% 🕊️${v.freedom}%
+        </button>
+      `).join("")}
+    </div>
+
+    <div class="card">
+      <h3>Illegales</h3>
+      ${Object.keys(MCs).map(mc=>`
+        <button onclick="buyWeapon('${mc}')">🔫 Waffe von ${mc}</button>
+      `).join("")}
+    </div>
+  `;
+
+  /* Polizei */
+  document.getElementById("panel-police").innerHTML = `
     <div class="card">
       Heat: ${p.heat}%<br>
-      <button onclick="bribe()">💸 Polizei schmieren</button>
+      <button onclick="bribePolice()">💸 Polizei schmieren</button>
     </div>
   `;
 }
 
-/* ================= ACTIONS ================= */
-function buyWeed(mc){
-  const p=state.chars[current];
-  if(p.money<500)return;
-  p.money-=500;p.weed++;p.heat+=5;MCs[mc].loyalty+=3;
-  save();renderGame();
-}
-function buyWeapon(mc){
-  const p=state.chars[current];
-  if(p.money<1000||MCs[mc].loyalty<50)return;
-  p.money-=1000;p.weapons++;p.heat+=8;MCs[mc].loyalty+=2;
-  save();renderGame();
-}
-function bribe(){
-  const p=state.chars[current];
-  const cost=p.liga===4?1000:3000;
-  if(p.money<cost)return;
-  p.money-=cost;p.heat=Math.max(0,p.heat-25);
-  save();renderGame();
+/* ---------- Shop-Logik ---------- */
+function buyLegal(price){
+  const p = state.chars[current];
+  if(p.money < price) return;
+  p.money -= price;
+  p.heat = Math.max(0, p.heat - 2);
+  save(); renderGame();
 }
 
-/* ================= INIT ================= */
+function hireMember(price,risk){
+  const p = state.chars[current];
+  if(p.money < price) return;
+  p.money -= price;
+  p.members++;
+  p.heat += risk;
+  save(); renderGame();
+}
+
+function buyVehicle(index){
+  const p = state.chars[current];
+  const v = VEHICLES[index];
+  if(p.money < v.price) return;
+  p.money -= v.price;
+  p.vehicle = v;
+  save(); renderGame();
+}
+
+function buyWeapon(mc){
+  const p = state.chars[current];
+  if(MCs[mc].loyalty < 50) return alert("Kein Vertrauen von "+mc);
+  if(p.money < 1000) return;
+  p.money -= 1000;
+  p.weapons++;
+  p.heat += 8;
+  MCs[mc].loyalty += 2;
+  save(); renderGame();
+}
+
+/* ---------- Polizei ---------- */
+function bribePolice(){
+  const p = state.chars[current];
+  const cost = p.liga === 4 ? 1000 : 3000;
+  if(p.money < cost) return;
+  p.money -= cost;
+  p.heat = Math.max(0, p.heat - 25);
+  save(); renderGame();
+}
+
+/* ---------- INIT ---------- */
 load();
 renderChars();
-</script>
 
+/* ================= TEIL 3 ENDET HIER ================= */
+</script>
 </body>
 </html>
