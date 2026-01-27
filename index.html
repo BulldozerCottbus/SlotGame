@@ -11,13 +11,10 @@
   --panel:#151515;
   --card:#1e1e1e;
   --accent:#b30000;
-  --good:#2ecc71;
-  --warn:#f1c40f;
-  --bad:#e74c3c;
-  --muted:#9aa0a6;
+  --text:#fff;
 }
-*{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont}
-body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
+*{box-sizing:border-box;font-family:system-ui}
+body{margin:0;background:var(--bg);color:var(--text);overflow:hidden}
 
 /* SCREENS */
 .screen{display:none;height:100vh;width:100vw}
@@ -25,107 +22,44 @@ body{margin:0;background:var(--bg);color:#fff;overflow:hidden}
 
 /* HUD */
 #hud{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:8px 12px;
-  background:#111;
-  border-bottom:1px solid #222;
-  font-size:14px;
+  display:flex;justify-content:space-between;
+  padding:8px 12px;background:#111;border-bottom:1px solid #222
 }
-.hud-heat.low{color:var(--good)}
-.hud-heat.mid{color:var(--warn)}
-.hud-heat.high{color:var(--bad);animation:pulse 1s infinite}
-@keyframes pulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
 
-/* CONTENT */
-#content{flex:1;position:relative;overflow:hidden}
+/* PANELS */
+#content{flex:1;position:relative}
 .panel{
-  position:absolute;
-  inset:0;
-  background:var(--panel);
-  padding:14px;
-  overflow-y:auto;
+  position:absolute;inset:0;
+  background:var(--panel);padding:14px;
   transform:translateX(100%);
-  transition:.35s ease;
+  transition:.3s ease;overflow-y:auto
 }
 .panel.active{transform:translateX(0)}
 
 /* BOTTOM BAR */
 #bottomBar{
-  display:flex;
-  justify-content:space-around;
-  background:#111;
-  border-top:1px solid #222;
-  padding:6px 0;
+  display:flex;justify-content:space-around;
+  background:#111;border-top:1px solid #222
 }
 #bottomBar button{
-  background:none;
-  border:none;
-  color:#888;
-  font-size:12px;
+  background:none;border:none;color:#888;padding:8px
 }
 #bottomBar button.active{
-  color:#fff;
-  border-bottom:2px solid var(--accent);
+  color:#fff;border-bottom:2px solid var(--accent)
 }
 
 /* UI */
 button{
-  background:var(--accent);
-  border:none;
-  color:#fff;
-  padding:10px;
-  border-radius:8px;
-  margin-top:6px;
+  background:var(--accent);border:none;
+  color:#fff;padding:10px;border-radius:8px;margin-top:6px
 }
 button.secondary{background:#333}
-.card{
-  background:var(--card);
-  border-radius:12px;
-  padding:14px;
-  margin-bottom:12px;
-}
-.region{
-  border:1px solid #333;
-  border-radius:10px;
-  padding:10px;
-  margin-bottom:10px;
-  cursor:pointer;
-}
-.bar{
-  height:8px;
-  background:#333;
-  border-radius:6px;
-  overflow:hidden;
-  margin-top:4px;
-}
-.bar > div{
-  height:100%;
-  background:var(--accent);
-}
+.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px}
+.region{border:1px solid #333;border-radius:10px;padding:10px;margin-bottom:10px;cursor:pointer}
+.bar{height:8px;background:#333;border-radius:6px;overflow:hidden}
+.bar div{height:100%;background:var(--accent)}
 
-/* CENTER */
-.center{
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  height:100%;
-}
-
-/* CREATE */
-.create-card{width:100%;max-width:320px}
-.create-card input,
-.create-card select{
-  width:100%;
-  padding:8px;
-  border-radius:8px;
-  border:none;
-  background:#111;
-  color:#fff;
-  margin-bottom:10px;
-}
+.center{display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%}
 </style>
 </head>
 
@@ -139,13 +73,36 @@ button.secondary{background:#333}
   </div>
 </section>
 
-<!-- CHARACTERS -->
+<!-- CHARAKTERE -->
 <section id="chars" class="screen">
   <div class="center">
     <h2>Charaktere</h2>
     <div id="charList"></div>
     <button onclick="go('create')">+ Neuer Charakter</button>
-    <button class="secondary" onclick="go('start')">Zurück</button>
+    <button class="secondary" onclick="go('settings')">⚙️ Einstellungen</button>
+  </div>
+</section>
+
+<!-- EINSTELLUNGEN -->
+<section id="settings" class="screen">
+  <div class="center">
+    <h2>Einstellungen</h2>
+    <div class="card">
+      <label>Grafik</label>
+      <select id="setGraphics">
+        <option>Niedrig</option><option>Mittel</option><option>Hoch</option>
+      </select>
+      <label>Audio</label>
+      <select id="setAudio">
+        <option>Aus</option><option>Leise</option><option>Laut</option>
+      </select>
+      <label>Modus</label>
+      <select id="setMode">
+        <option>Handy</option><option>PC</option>
+      </select>
+      <button onclick="saveSettings()">Speichern</button>
+      <button class="secondary" onclick="go('chars')">Zurück</button>
+    </div>
   </div>
 </section>
 
@@ -153,13 +110,12 @@ button.secondary{background:#333}
 <section id="create" class="screen">
   <div class="center">
     <h2>Neuer Charakter</h2>
-    <div class="card create-card">
-      <input id="nameInput" placeholder="Name (Liga 4)">
-      <select id="ligaInput" onchange="updateCreateUI()">
+    <div class="card">
+      <input id="nameInput" placeholder="Name">
+      <select id="ligaInput">
         <option value="4">Liga 4 – Eigenständig</option>
         <option value="3">Liga 3 – Supporter</option>
       </select>
-      <select id="mcSelect" style="display:none"></select>
       <button onclick="createChar()">Erstellen</button>
       <button class="secondary" onclick="go('chars')">Abbrechen</button>
     </div>
@@ -169,10 +125,10 @@ button.secondary{background:#333}
 <!-- GAME -->
 <section id="game" class="screen">
   <div id="hud">
-    <div>💶 <span id="hudMoney">0</span></div>
-    <div>👥 <span id="hudMembers">0</span></div>
-    <div>🔫 <span id="hudWeapons">0</span></div>
-    <div id="hudHeat" class="hud-heat low">Heat 0%</div>
+    💶 <span id="hudMoney">0</span>
+    👥 <span id="hudMembers">0</span>
+    🔫 <span id="hudWeapons">0</span>
+    🔥 <span id="hudHeat">0%</span>
   </div>
 
   <div id="content">
@@ -184,19 +140,20 @@ button.secondary{background:#333}
   </div>
 
   <div id="bottomBar">
-    <button id="btn-char" class="active" onclick="openPanel('char')">👤</button>
-    <button id="btn-map" onclick="openPanel('map')">🗺️</button>
-    <button id="btn-shop" onclick="openPanel('shop')">🏪</button>
-    <button id="btn-police" onclick="openPanel('police')">🚓</button>
+    <button onclick="openPanel('char')" class="active">👤</button>
+    <button onclick="openPanel('map')">🗺️</button>
+    <button onclick="openPanel('shop')">🏪</button>
+    <button onclick="openPanel('police')">🚓</button>
   </div>
 </section>
 
 <script>
-/* ======= TEIL 1 ENDET HIER ======= */
-/* WEITER MIT TEIL 2 */
-/* ================= TEIL 2: DATEN & SYSTEME ================= */
+/* ===== TEIL 1 ENDET ===== */
+/* ================= TEIL 2: DATEN ================= */
 
-const SAVE_KEY = "rocker_empire_master_v8";
+/* ---------- SAVE KEYS ---------- */
+const SAVE_KEY_GAME = "rocker_empire_game_v9";
+const SAVE_KEY_SETTINGS = "rocker_empire_settings_v1";
 
 /* ---------- MCs ---------- */
 const MCs = {
@@ -207,7 +164,7 @@ const MCs = {
   "Sons of Silence": {}
 };
 
-/* ---------- Regionen (alle anklickbar) ---------- */
+/* ---------- ORTE (Deutschland komplett) ---------- */
 const REGIONS = [
   { name:"Berlin", owner:"Hells Angels MC" },
   { name:"Brandenburg", owner:"Hells Angels MC" },
@@ -228,7 +185,7 @@ const REGIONS = [
   { name:"Mecklenburg-Vorpommern", owner:"Sons of Silence" }
 ];
 
-/* ---------- Liga 3 Supporter ---------- */
+/* ---------- LIGA-3 SUPPORTER ---------- */
 const LIGA3_MCS = [
   "Bulldozer Cottbus",
   "Red Devils Support",
@@ -237,14 +194,50 @@ const LIGA3_MCS = [
   "Independent Brotherhood"
 ];
 
-/* ---------- Geschenk-System ---------- */
+/* ---------- GESCHENKE (MIT PREISEN & %) ---------- */
 const GIFTS = {
-  small: { min:1000, max:15000, gain:[1,3], cooldown:5 },
-  big: { min:30000, max:60000, gain:[5,8], cooldown:5 },
-  huge:{ min:90000, max:150000, gain:[9,11], cooldown:8 }
+  small: {
+    name: "Kleines Geschenk",
+    priceMin: 1000,
+    priceMax: 15000,
+    gainMin: 1,
+    gainMax: 3,
+    cooldownHours: 5
+  },
+  big: {
+    name: "Großes Geschenk",
+    priceMin: 30000,
+    priceMax: 60000,
+    gainMin: 5,
+    gainMax: 8,
+    cooldownHours: 5
+  },
+  huge: {
+    name: "Big Geschenk",
+    priceMin: 90000,
+    priceMax: 150000,
+    gainMin: 9,
+    gainMax: 11,
+    cooldownHours: 8
+  }
 };
 
-/* ---------- Fahrzeuge ---------- */
+/* ---------- LEGALE SHOP-ITEMS ---------- */
+const LEGAL_ITEMS = [
+  { name:"Kleidung", price:200, effect:"stability" },
+  { name:"Essen", price:100, effect:"stability" },
+  { name:"Getränke", price:80, effect:"stability" },
+  { name:"Verbandszeug", price:150, effect:"safety" }
+];
+
+/* ---------- MITGLIEDER ---------- */
+const MEMBERS = [
+  { name:"Prospect", price:500, risk:5 },
+  { name:"Clubmitglied", price:1500, risk:10 },
+  { name:"Fremder MC", price:800, risk:25 }
+];
+
+/* ---------- FAHRZEUGE ---------- */
 const VEHICLES = [
   { name:"Schrottbike", price:5000, speed:20, power:15, safety:10, freedom:25 },
   { name:"Street Cruiser", price:25000, speed:40, power:35, safety:30, freedom:45 },
@@ -252,34 +245,26 @@ const VEHICLES = [
   { name:"Elite Road King", price:100000, speed:80, power:75, safety:70, freedom:85 }
 ];
 
-/* ---------- Legale Items ---------- */
-const LEGAL_ITEMS = [
-  { name:"Kleidung", price:200 },
-  { name:"Essen", price:100 },
-  { name:"Getränke", price:80 },
-  { name:"Verbandszeug", price:150 }
-];
-
-/* ---------- Mitglieder ---------- */
-const MEMBERS = [
-  { name:"Prospect", price:500, risk:5 },
-  { name:"Clubmitglied", price:1500, risk:10 },
-  { name:"Fremder MC", price:800, risk:25 }
-];
-
 /* ---------- SPIELSTATE ---------- */
 let state = {
-  chars:[]
+  chars: []
 };
 
 let current = null;
 let selectedRegion = null;
 
+/* ---------- EINSTELLUNGEN STATE ---------- */
+let settings = {
+  graphics: "Mittel",
+  audio: "Leise",
+  mode: "Handy"
+};
+
 /* ================= TEIL 2 ENDET HIER ================= */
-/* WEITER MIT TEIL 3 – LOGIK & VERHALTEN */
+/* WEITER MIT TEIL 3 – LOGIK, COOLDOWNS, SAVE */
 /* ================= TEIL 3: LOGIK & VERHALTEN ================= */
 
-/* ---------- Navigation ---------- */
+/* ---------- NAV ---------- */
 function go(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -288,81 +273,81 @@ function openPanel(name){
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
   document.getElementById("panel-"+name).classList.add("active");
   document.querySelectorAll("#bottomBar button").forEach(b=>b.classList.remove("active"));
-  const btn=document.getElementById("btn-"+name); if(btn) btn.classList.add("active");
 }
 
-/* ---------- Save / Load ---------- */
-function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
-function load(){
-  const d=localStorage.getItem(SAVE_KEY);
+/* ---------- SAVE / LOAD ---------- */
+function saveGame(){ localStorage.setItem(SAVE_KEY_GAME, JSON.stringify(state)); }
+function loadGame(){
+  const d=localStorage.getItem(SAVE_KEY_GAME);
   if(d) state=JSON.parse(d);
 }
+function saveSettings(){
+  settings.graphics=document.getElementById("setGraphics").value;
+  settings.audio=document.getElementById("setAudio").value;
+  settings.mode=document.getElementById("setMode").value;
+  localStorage.setItem(SAVE_KEY_SETTINGS, JSON.stringify(settings));
+  applySettings();
+  alert("Einstellungen gespeichert");
+}
+function loadSettings(){
+  const s=localStorage.getItem(SAVE_KEY_SETTINGS);
+  if(s) settings=JSON.parse(s);
+}
+function applySettings(){
+  document.body.style.filter =
+    settings.graphics==="Niedrig" ? "contrast(0.9) brightness(0.9)" :
+    settings.graphics==="Hoch" ? "contrast(1.05) brightness(1.05)" : "none";
+}
 
-/* ---------- Utils ---------- */
+/* ---------- UTILS ---------- */
 const now=()=>Date.now();
 const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
-const pct=(v)=>Math.max(0,Math.min(100,Math.round(v)));
-function cooldownLeft(ts,hrs){
+const pct=v=>Math.max(0,Math.min(100,Math.round(v)));
+function cdLeft(ts,h){
   if(!ts) return 0;
-  const ms=hrs*60*60*1000;
-  return Math.max(0, ms-(now()-ts));
+  return Math.max(0, h*3600000-(now()-ts));
 }
 function fmt(ms){
-  const s=Math.ceil(ms/1000);
-  const h=Math.floor(s/3600);
-  const m=Math.floor((s%3600)/60);
-  const r=s%60;
+  const s=Math.ceil(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;
   return (h?`${h}h `:"")+(m?`${m}m `:"")+`${r}s`;
 }
 
-/* ---------- Charakter-Erstellung ---------- */
-function updateCreateUI(){
-  mcSelect.style.display = ligaInput.value==3 ? "block" : "none";
-  if(ligaInput.value==3){
-    mcSelect.innerHTML="";
-    LIGA3_MCS.forEach(m=>mcSelect.innerHTML+=`<option>${m}</option>`);
-  }
-}
+/* ---------- CHAR CREATE ---------- */
 function createChar(){
-  const liga=+ligaInput.value;
+  const liga=+document.getElementById("ligaInput").value;
   state.chars.push({
     liga,
-    name: liga===4 ? (nameInput.value||"Rider") : mcSelect.value,
-    mc: liga===4 ? "Eigenständig" : mcSelect.value,
+    name: liga===4?(document.getElementById("nameInput").value||"Rider"):"Supporter",
+    mc: liga===4?"Eigenständig":"Supporter",
     money: liga===4?500:2000,
     members: liga===4?1:6,
     influence: liga===4?0:20,
-    weapons:0,
-    weed:0,
-    heat:0,
+    weapons:0, weed:0, heat:0,
     vehicle:null,
-    relations:{},              // { MC:{friend:%, lastReq, lastGift, lastVisit} }
-    lastAttack:{}              // { MC: timestamp }
+    relations:{}, lastAttack:{}
   });
-  save(); renderChars(); go("chars");
+  saveGame(); renderChars(); go("chars");
 }
 
-/* ---------- Charakterliste ---------- */
+/* ---------- CHAR LIST ---------- */
 function renderChars(){
-  charList.innerHTML="";
-  state.chars.forEach((c,i)=>{
-    charList.innerHTML+=`<button onclick="startGame(${i})">${c.name} (Liga ${c.liga})</button>`;
-  });
+  const c=document.getElementById("charList"); c.innerHTML="";
+  state.chars.forEach((x,i)=>c.innerHTML+=
+    `<button onclick="startGame(${i})">${x.name} (Liga ${x.liga})</button>`);
 }
-function startGame(i){
-  current=i;
-  go("game");
-  renderGame();
-}
+function startGame(i){ current=i; go("game"); renderGame(); }
 
-/* ---------- HUD & Panels ---------- */
+/* ---------- GAME RENDER ---------- */
+function ensureRel(p,mc){
+  if(!p.relations[mc]) p.relations[mc]={friend:0};
+  return p.relations[mc];
+}
 function renderGame(){
   const p=state.chars[current];
   hudMoney.textContent=p.money;
   hudMembers.textContent=p.members;
   hudWeapons.textContent=p.weapons;
-  hudHeat.textContent="Heat "+p.heat+"%";
-  hudHeat.className="hud-heat "+(p.heat<40?"low":p.heat<70?"mid":"high");
+  hudHeat.textContent=p.heat+"%";
 
   /* CHAR */
   document.getElementById("panel-char").innerHTML=`
@@ -372,227 +357,170 @@ function renderGame(){
       Club: ${p.mc}<br>
       Einfluss: ${p.influence}%<br>
       Fahrzeug: ${p.vehicle?p.vehicle.name:"Keins"}
-    </div>
-  `;
+    </div>`;
 
   /* MAP */
-  document.getElementById("panel-map").innerHTML=REGIONS.map((r,idx)=>{
-    const rel=p.relations[r.owner]||{friend:0};
-    return `
-      <div class="region" onclick="openRegion(${idx})">
-        <strong>${r.name}</strong><br>
-        Besitzer: ${r.owner}<br>
-        Freundschaft: ${pct(rel.friend||0)}%
-        <div class="bar"><div style="width:${pct(rel.friend||0)}%"></div></div>
-      </div>
-    `;
+  document.getElementById("panel-map").innerHTML=REGIONS.map((r,i)=>{
+    const rel=ensureRel(p,r.owner);
+    return `<div class="region" onclick="openRegion(${i})">
+      <strong>${r.name}</strong><br>
+      Besitzer: ${r.owner}<br>
+      Freundschaft: ${pct(rel.friend)}%
+      <div class="bar"><div style="width:${pct(rel.friend)}%"></div></div>
+    </div>`;
   }).join("");
 
   /* SHOP */
   document.getElementById("panel-shop").innerHTML=`
-    <div class="card">
-      <h3>Legales</h3>
+    <div class="card"><h3>Geschenke</h3>
+      ${Object.values(GIFTS).map(g=>`
+        <div>${g.name}: ${g.priceMin}–${g.priceMax}€ (+${g.gainMin}–${g.gainMax}%)</div>
+      `).join("")}
+      <small>Geschenke werden im Orts-Panel übergeben</small>
+    </div>
+    <div class="card"><h3>Legales</h3>
       ${LEGAL_ITEMS.map(i=>`<button onclick="buyLegal(${i.price})">${i.name} – ${i.price}€</button>`).join("")}
     </div>
-
-    <div class="card">
-      <h3>Mitglieder</h3>
+    <div class="card"><h3>Mitglieder</h3>
       ${MEMBERS.map(m=>`<button onclick="hireMember(${m.price},${m.risk})">${m.name} – ${m.price}€</button>`).join("")}
     </div>
-
-    <div class="card">
-      <h3>Geschenke</h3>
-      <button onclick="buyGift('small')">🎁 Klein (1–3%)</button>
-      <button onclick="buyGift('big')">🎁 Groß (5–8%)</button>
-      <button onclick="buyGift('huge')">🎁 Big (9–11%)</button>
-      <small>Geschenke wirken im Orts-Panel</small>
-    </div>
-
-    <div class="card">
-      <h3>Fahrzeuge</h3>
+    <div class="card"><h3>Fahrzeuge</h3>
       ${VEHICLES.map((v,i)=>`
         <button onclick="buyVehicle(${i})">
-          ${v.name} – ${v.price}€<br>
-          ⚡${v.speed}% 💪${v.power}% 🛡️${v.safety}% 🕊️${v.freedom}%
+          ${v.name} – ${v.price}€ | ⚡${v.speed}% 💪${v.power}% 🛡️${v.safety}% 🕊️${v.freedom}%
         </button>`).join("")}
     </div>
-
-    <div class="card">
-      <h3>Waffen</h3>
+    <div class="card"><h3>Waffen</h3>
       ${Object.keys(MCs).map(mc=>`<button onclick="buyWeapon('${mc}')">🔫 von ${mc}</button>`).join("")}
-    </div>
-  `;
+    </div>`;
 
   /* POLICE */
   document.getElementById("panel-police").innerHTML=`
     <div class="card">
       Heat: ${p.heat}%<br>
       <button onclick="bribePolice()">💸 Polizei schmieren</button>
-    </div>
-  `;
+    </div>`;
 }
 
-/* ---------- Region Panel ---------- */
+/* ---------- REGION PANEL ---------- */
 function openRegion(idx){
   selectedRegion=idx;
-  const r=REGIONS[idx];
-  const p=state.chars[current];
-  const rel=p.relations[r.owner]||{friend:0};
-  const leftReq=cooldownLeft(rel.lastReq,1);
-  const leftGiftSmall=cooldownLeft(rel.lastGiftSmall, GIFTS.small.cooldown);
-  const leftGiftBig=cooldownLeft(rel.lastGiftBig, GIFTS.big.cooldown);
-  const leftGiftHuge=cooldownLeft(rel.lastGiftHuge, GIFTS.huge.cooldown);
-  const leftVisit=cooldownLeft(rel.lastVisit,2);
+  const r=REGIONS[idx], p=state.chars[current], rel=ensureRel(p,r.owner);
+  const cdReq=cdLeft(rel.lastReq,1);
+  const cdV=cdLeft(rel.lastVisit,2);
+  const cdS=cdLeft(rel.lastGiftSmall, GIFTS.small.cooldownHours);
+  const cdB=cdLeft(rel.lastGiftBig, GIFTS.big.cooldownHours);
+  const cdH=cdLeft(rel.lastGiftHuge, GIFTS.huge.cooldownHours);
 
   document.getElementById("panel-region").innerHTML=`
     <div class="card">
-      <strong>${r.name}</strong><br>
-      MC: ${r.owner}<br>
-      Freundschaft: ${pct(rel.friend||0)}%
-      <div class="bar"><div style="width:${pct(rel.friend||0)}%"></div></div>
+      <strong>${r.name}</strong><br>MC: ${r.owner}<br>
+      Freundschaft: ${pct(rel.friend)}%
+      <div class="bar"><div style="width:${pct(rel.friend)}%"></div></div>
     </div>
 
     <div class="card">
-      <h3>🤝 Freundschaft</h3>
-      <button ${leftReq?"disabled":""} onclick="requestFriend('${r.owner}')">
-        Anfrage ${leftReq?`(Cooldown ${fmt(leftReq)})`:""}
+      <button ${cdReq?"disabled":""} onclick="requestFriend('${r.owner}')">
+        🤝 Freundschaft anfragen ${cdReq?`(${fmt(cdReq)})`:""}
       </button>
     </div>
 
     <div class="card">
-      <h3>🎁 Geschenke</h3>
-      <button ${leftGiftSmall?"disabled":""} onclick="giveGift('${r.owner}','small')">
-        Klein ${leftGiftSmall?`(${fmt(leftGiftSmall)})`:""}
+      <button ${cdS?"disabled":""} onclick="giveGift('${r.owner}','small')">
+        🎁 Klein (${GIFTS.small.priceMin}–${GIFTS.small.priceMax}€)
       </button>
-      <button ${leftGiftBig?"disabled":""} onclick="giveGift('${r.owner}','big')">
-        Groß ${leftGiftBig?`(${fmt(leftGiftBig)})`:""}
+      <button ${cdB?"disabled":""} onclick="giveGift('${r.owner}','big')">
+        🎁 Groß (${GIFTS.big.priceMin}–${GIFTS.big.priceMax}€)
       </button>
-      <button ${leftGiftHuge?"disabled":""} onclick="giveGift('${r.owner}','huge')">
-        Big ${leftGiftHuge?`(${fmt(leftGiftHuge)})`:""}
-      </button>
-    </div>
-
-    <div class="card">
-      <h3>🏍️ Besuch</h3>
-      <button ${ (rel.friend||0)<1 || leftVisit ? "disabled":"" } onclick="visitMC('${r.owner}')">
-        Besuch anfragen ${leftVisit?`(${fmt(leftVisit)})`:""}
+      <button ${cdH?"disabled":""} onclick="giveGift('${r.owner}','huge')">
+        🎁 Big (${GIFTS.huge.priceMin}–${GIFTS.huge.priceMax}€)
       </button>
     </div>
 
     <div class="card">
-      <h3>⚔️ Angriff</h3>
-      <button onclick="attackMC('${r.owner}')">Angreifen</button>
+      <button ${(rel.friend<1||cdV)?"disabled":""} onclick="visitMC('${r.owner}')">
+        🏍️ Besuch ${cdV?`(${fmt(cdV)})`:""}
+      </button>
     </div>
 
-    <button class="secondary" onclick="openPanel('map')">Schließen</button>
-  `;
-  openPanel('region');
+    <div class="card">
+      <button onclick="attackMC('${r.owner}')">⚔️ Angriff</button>
+    </div>
+
+    <button class="secondary" onclick="openPanel('map')">Schließen</button>`;
+  openPanel("region");
 }
 
-/* ---------- Freundschaft ---------- */
-function ensureRel(p,mc){
-  if(!p.relations[mc]) p.relations[mc]={friend:0};
-  return p.relations[mc];
-}
+/* ---------- ACTIONS ---------- */
 function requestFriend(mc){
-  const p=state.chars[current];
-  const rel=ensureRel(p,mc);
+  const p=state.chars[current], rel=ensureRel(p,mc);
   rel.lastReq=now();
-  if(Math.random()<0.2){
-    rel.friend=Math.max(rel.friend||0,1);
-    alert("Anfrage angenommen!");
-  }else{
-    rel.friend=pct((rel.friend||0)-1);
-    alert("Abgelehnt.");
-  }
-  save(); renderGame(); openRegion(selectedRegion);
-}
-function buyGift(type){
-  alert("Geschenk gekauft. Wähle einen Ort und übergib es dort.");
+  if(Math.random()<0.2){ rel.friend=Math.max(1,rel.friend); alert("Angenommen"); }
+  else{ rel.friend=pct(rel.friend-1); alert("Abgelehnt"); }
+  saveGame(); renderGame(); openRegion(selectedRegion);
 }
 function giveGift(mc,type){
-  const p=state.chars[current];
-  const rel=ensureRel(p,mc);
-  const g=GIFTS[type];
-  const price=rnd(g.min,g.max);
+  const p=state.chars[current], rel=ensureRel(p,mc), g=GIFTS[type];
+  const price=rnd(g.priceMin,g.priceMax);
   if(p.money<price) return alert("Nicht genug Geld");
-  p.money-=price;
-  const inc=rnd(g.gain[0],g.gain[1]);
-  rel.friend=pct((rel.friend||0)+inc);
+  p.money-=price; rel.friend=pct(rel.friend+rnd(g.gainMin,g.gainMax));
   rel["lastGift"+type.charAt(0).toUpperCase()+type.slice(1)]=now();
-  save(); renderGame(); openRegion(selectedRegion);
+  saveGame(); renderGame(); openRegion(selectedRegion);
 }
-
-/* ---------- Besuch ---------- */
 function visitMC(mc){
-  const p=state.chars[current];
-  const rel=ensureRel(p,mc);
+  const p=state.chars[current], rel=ensureRel(p,mc);
   rel.lastVisit=now();
-  const f=rel.friend||0;
-  const reject=Math.max(0.1, 1 - (f/100));
-  if(Math.random()<reject){
-    alert("Besuch abgelehnt.");
-  }else{
-    p.influence=pct(p.influence+2);
-    rel.friend=pct(rel.friend+1);
-    alert("Besuch erfolgreich.");
-  }
-  save(); renderGame(); openRegion(selectedRegion);
+  const reject=Math.max(0.1,1-rel.friend/100);
+  if(Math.random()<reject) alert("Besuch abgelehnt");
+  else{ p.influence=pct(p.influence+2); rel.friend=pct(rel.friend+1); alert("Besuch erfolgreich"); }
+  saveGame(); renderGame(); openRegion(selectedRegion);
 }
-
-/* ---------- Angriff ---------- */
 function attackMC(mc){
   const p=state.chars[current];
-  if(p.weapons<1) return alert("Keine Waffen!");
-  p.weapons--;
-  p.heat=pct(p.heat+15);
-  p.influence=pct(p.influence+5);
-  const rel=ensureRel(p,mc);
-  rel.friend=pct((rel.friend||0)-15);
+  if(p.weapons<1) return alert("Keine Waffen");
+  p.weapons--; p.heat=pct(p.heat+15); p.influence=pct(p.influence+5);
+  const rel=ensureRel(p,mc); rel.friend=pct(rel.friend-15);
   p.lastAttack[mc]=now();
-  alert("Angriff durchgeführt. Gegenschlag möglich!");
-  save(); renderGame(); openRegion(selectedRegion);
+  alert("Angriff! Gegenschlag möglich.");
+  saveGame(); renderGame(); openRegion(selectedRegion);
 }
 
-/* ---------- Shop / Polizei ---------- */
+/* ---------- SHOP ---------- */
 function buyLegal(price){
   const p=state.chars[current];
   if(p.money<price) return;
-  p.money-=price;
-  p.heat=pct(p.heat-2);
-  save(); renderGame();
+  p.money-=price; p.heat=pct(p.heat-2);
+  saveGame(); renderGame();
 }
 function hireMember(price,risk){
   const p=state.chars[current];
   if(p.money<price) return;
   p.money-=price; p.members++; p.heat=pct(p.heat+risk);
-  save(); renderGame();
+  saveGame(); renderGame();
 }
 function buyVehicle(i){
   const p=state.chars[current], v=VEHICLES[i];
   if(p.money<v.price) return;
   p.money-=v.price; p.vehicle=v;
-  save(); renderGame();
+  saveGame(); renderGame();
 }
 function buyWeapon(mc){
-  const p=state.chars[current];
-  const rel=ensureRel(p,mc);
-  if((rel.friend||0)<50) return alert("Kein Vertrauen");
+  const p=state.chars[current], rel=ensureRel(p,mc);
+  if(rel.friend<50) return alert("Kein Vertrauen");
   if(p.money<1000) return;
   p.money-=1000; p.weapons++; p.heat=pct(p.heat+8);
-  save(); renderGame();
+  saveGame(); renderGame();
 }
 function bribePolice(){
-  const p=state.chars[current];
-  const cost=p.liga===4?1000:3000;
+  const p=state.chars[current], cost=p.liga===4?1000:3000;
   if(p.money<cost) return;
   p.money-=cost; p.heat=pct(p.heat-25);
-  save(); renderGame();
+  saveGame(); renderGame();
 }
 
 /* ---------- INIT ---------- */
-load();
-renderChars();
+loadSettings(); applySettings();
+loadGame(); renderChars();
 
 /* ================= ENDE ================= */
 </script>
