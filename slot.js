@@ -1,7 +1,8 @@
-/* Slot Studio v2
+/* Slot Studio v2.1
    - Admin gate: Ctrl+Alt+# + Code => Builder + RTP sichtbar
    - Multi-Slots: mehrere Slot-Definitionen + Slot-Wechsel
-   - Triple-Triple Chance Feature: Trigger bei Vollbild (15 gleiche)
+   - Variable Reels: 3 oder 5 Walzen (dynamische UI)
+   - Triple-Triple Chance Feature: Trigger bei Vollbild (bei 3x3 = 9 gleiche)
 */
 
 const $ = (id) => document.getElementById(id);
@@ -36,8 +37,8 @@ const DEFAULT_DEF = {
   startCredits: 200,
   accent: "#00e5ff",
   rows: 3,
-  reels: 5,
-  reelMode: "independent", // independent | stacked
+  reels: 5,                 // ✅ 5 Walzen Default
+  reelMode: "independent",  // independent | stacked
   features: {
     ttChanceEnabled: false,
     ttGreens: 5,
@@ -63,25 +64,36 @@ const DEFAULT_DEF = {
   ]
 };
 
+/* ✅ Triple-Triple Chance = 3 Walzen, 5 Paylines (wie bei Merkur) */
 const TTC_DEF = {
   ...structuredClone(DEFAULT_DEF),
   name: "Triple-Triple Chance",
   startCredits: 250,
   accent: "#00ffb3",
-  reelMode: "stacked", // macht Vollbild realistischer
+  reels: 3,                 // ✅ NUR 3 Walzen
+  reelMode: "stacked",      // damit Vollbild realistischer wird
   features: {
     ttChanceEnabled: true,
-    ttGreens: 5,
-    ttReds: 1,
-    ttMaxRounds: 12
+    ttGreens: 3,            // ✅ „mehrere grüne“ – typisch 3 grün
+    ttReds: 1,              // ✅ 1 rot
+    ttMaxRounds: 0          // ✅ 0 = unlimited
   },
+  // 3 Walzen – klassische Früchte
   symbols: [
-    { id:"triple", icon:"🟩", name:"Triple",  weight:6,  pay:{3:20, 4:120, 5:900} },
-    { id:"bar",    icon:"🟥", name:"Bar",     weight:14, pay:{3:10, 4:50,  5:300} },
-    { id:"star",   icon:"⭐",  name:"Star",    weight:18, pay:{3:8,  4:40,  5:220} },
-    { id:"bell",   icon:"🔔", name:"Bell",    weight:22, pay:{3:6,  4:28,  5:150} },
-    { id:"lemon",  icon:"🍋", name:"Lemon",   weight:28, pay:{3:4,  4:16,  5:90}  },
-    { id:"cherry", icon:"🍒", name:"Cherry",  weight:28, pay:{3:4,  4:16,  5:90}  },
+    { id:"plum",   icon:"🫐", name:"Pflaume", weight:20, pay:{3:8,  4:0,   5:0} },
+    { id:"cherry", icon:"🍒", name:"Kirsche", weight:22, pay:{3:6,  4:0,   5:0} },
+    { id:"lemon",  icon:"🍋", name:"Zitrone", weight:24, pay:{3:5,  4:0,   5:0} },
+    { id:"bell",   icon:"🔔", name:"Glocke",  weight:16, pay:{3:10, 4:0,   5:0} },
+    { id:"diamond",icon:"💚", name:"Diamant", weight:10, pay:{3:14, 4:0,   5:0} },
+    { id:"seven",  icon:"7️⃣", name:"7",      weight:8,  pay:{3:25, 4:0,   5:0} },
+  ],
+  // 5 Paylines auf 3 Walzen (Top, Mid, Bottom, Diag, Diag)
+  lines: [
+    { id:"mid",  name:"Middle", pattern:[1,1,1], enabled:true },
+    { id:"top",  name:"Top",    pattern:[0,0,0], enabled:true },
+    { id:"bot",  name:"Bottom", pattern:[2,2,2], enabled:true },
+    { id:"d1",   name:"Diag ↘", pattern:[0,1,2], enabled:true },
+    { id:"d2",   name:"Diag ↗", pattern:[2,1,0], enabled:true },
   ]
 };
 
@@ -92,6 +104,29 @@ const LS_SLOTS_KEY = "slotStudio.slots.v2";
 const LS_CURRENT_SLOT = "slotStudio.currentSlotId.v2";
 const LS_STATE_MAP = "slotStudio.stateMap.v2";
 
+function clampInt(v, min, max){
+  v = Number(v);
+  if (Number.isNaN(v)) v = min;
+  v = v|0;
+  return Math.max(min, Math.min(max, v));
+}
+function clampRow(n) {
+  n = Number(n);
+  if (Number.isNaN(n)) return 1;
+  return Math.min(2, Math.max(0, n|0));
+}
+
+/* ✅ Pattern-Länge dynamisch (3 oder 5) */
+function normalizePattern(pat, reels){
+  const out = [];
+  const src = Array.isArray(pat) ? pat : [];
+  for (let i=0;i<reels;i++){
+    const v = (i < src.length) ? src[i] : 1;
+    out.push(clampRow(v));
+  }
+  return out;
+}
+
 function normalizeDef(def) {
   const base = structuredClone(DEFAULT_DEF);
   const out = structuredClone(base);
@@ -100,14 +135,19 @@ function normalizeDef(def) {
     out.name = String(def.name ?? out.name);
     out.startCredits = Math.max(0, Number(def.startCredits ?? out.startCredits) | 0);
     out.accent = String(def.accent ?? out.accent);
-    out.rows = 3; out.reels = 5;
+    out.rows = 3;
+
+    // ✅ reels erlauben: 3 oder 5
+    const r = Number(def.reels);
+    out.reels = (r === 3 || r === 5) ? r : base.reels;
+
     out.reelMode = (def.reelMode === "stacked") ? "stacked" : "independent";
 
     out.features = {
       ttChanceEnabled: !!def.features?.ttChanceEnabled,
-      ttGreens: clampInt(def.features?.ttGreens ?? 5, 1, 20),
+      ttGreens: clampInt(def.features?.ttGreens ?? 3, 1, 20),
       ttReds: clampInt(def.features?.ttReds ?? 1, 1, 20),
-      ttMaxRounds: clampInt(def.features?.ttMaxRounds ?? 10, 0, 99)
+      ttMaxRounds: clampInt(def.features?.ttMaxRounds ?? 0, 0, 99)
     };
 
     if (Array.isArray(def.symbols) && def.symbols.length >= 3) {
@@ -128,23 +168,18 @@ function normalizeDef(def) {
       out.lines = def.lines.map((l, i) => ({
         id: String(l.id ?? `l${i}`),
         name: String(l.name ?? `Line ${i+1}`),
-        pattern: Array.isArray(l.pattern) && l.pattern.length === 5 ? l.pattern.map(clampRow) : [1,1,1,1,1],
+        pattern: normalizePattern(l.pattern, out.reels),
         enabled: !!l.enabled
       }));
     }
   }
+
+  // safety: mindestens 1 line
+  if (!Array.isArray(out.lines) || out.lines.length === 0) {
+    out.lines = [{ id:"mid", name:"Middle", pattern: normalizePattern([1,1,1,1,1], out.reels), enabled:true }];
+  }
+
   return out;
-}
-function clampRow(n) {
-  n = Number(n);
-  if (Number.isNaN(n)) return 1;
-  return Math.min(2, Math.max(0, n|0));
-}
-function clampInt(v, min, max){
-  v = Number(v);
-  if (Number.isNaN(v)) v = min;
-  v = v|0;
-  return Math.max(min, Math.min(max, v));
 }
 
 function loadSlots() {
@@ -276,6 +311,7 @@ function beep(freq, durMs, type="sine", gain=0.06) {
   osc.frequency.value = freq;
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+  g.gain.exponentialRampToToValueAtTime?.(0.0001, t0 + durMs/1000); // harmless if unsupported
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + durMs/1000);
   osc.connect(g).connect(AC.destination);
   osc.start(t0);
@@ -315,8 +351,8 @@ let ttc = {
   pending: 0,
   greens: 0,
   round: 0,
-  maxRounds: 10,
-  greensPerRound: 5,
+  maxRounds: 0,
+  greensPerRound: 3,
   redsPerRound: 1
 };
 
@@ -416,10 +452,7 @@ function applyAdminUI(){
   simBtn.classList.toggle("hidden", !isAdmin);
   adminPill.classList.toggle("hidden", !isAdmin);
 
-  // wenn nicht admin und gerade im builder -> zurück zu play
-  if (!isAdmin && !viewBuilder.classList.contains("hidden")) {
-    showPlay();
-  }
+  if (!isAdmin && !viewBuilder.classList.contains("hidden")) showPlay();
 }
 
 function openAdminModal(){
@@ -438,8 +471,8 @@ document.addEventListener("keydown", (e) => {
 
   const keyIsHash =
     e.key === "#" ||
-    (e.code === "Digit3") || // viele layouts
-    (e.key === "3");         // fallback
+    (e.code === "Digit3") ||
+    (e.key === "3");
 
   if (keyIsHash) {
     e.preventDefault();
@@ -480,7 +513,7 @@ function showPlay() {
   viewBuilder.classList.add("hidden");
 }
 function showBuilder() {
-  if (!isAdmin) return; // hard block
+  if (!isAdmin) return;
   tabBuilder.classList.add("active");
   tabPlay.classList.remove("active");
   viewBuilder.classList.remove("hidden");
@@ -491,11 +524,13 @@ tabPlay.onclick = showPlay;
 tabBuilder.onclick = showBuilder;
 
 /* =========================
-   Render reels
+   Render reels (DYNAMISCH)
 ========================= */
 function renderReels() {
   reelsEl.innerHTML = "";
-  cellMatrix = Array.from({length:3}, ()=>Array(5).fill(null));
+  reelsEl.style.gridTemplateColumns = `repeat(${def.reels}, minmax(0,1fr))`; // ✅ 3 oder 5
+
+  cellMatrix = Array.from({length:def.rows}, ()=>Array(def.reels).fill(null));
 
   for (let r = 0; r < def.reels; r++) {
     const col = document.createElement("div");
@@ -532,15 +567,15 @@ function syncHUD() {
 }
 
 function clearHighlights() {
-  for (let row=0; row<3; row++) {
-    for (let r=0; r<5; r++) {
+  for (let row=0; row<def.rows; row++) {
+    for (let r=0; r<def.reels; r++) {
       cellMatrix[row][r].classList.remove("win","dim");
     }
   }
 }
 function dimAllExcept(coordsSet) {
-  for (let row=0; row<3; row++) {
-    for (let r=0; r<5; r++) {
+  for (let row=0; row<def.rows; row++) {
+    for (let r=0; r<def.reels; r++) {
       const key = `${row},${r}`;
       if (!coordsSet.has(key)) cellMatrix[row][r].classList.add("dim");
     }
@@ -562,14 +597,13 @@ function startSpinAnimation() {
   spinTick();
 
   const intervals = [];
-  for (let r=0; r<5; r++) {
+  for (let r=0; r<def.reels; r++) {
     const iv = setInterval(() => {
-      // Preview: abhängig vom Reel Mode
       if (def.reelMode === "stacked") {
         const sym = randomSymbolFromBag();
-        for (let row=0; row<3; row++) renderCell(cellMatrix[row][r], sym);
+        for (let row=0; row<def.rows; row++) renderCell(cellMatrix[row][r], sym);
       } else {
-        for (let row=0; row<3; row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+        for (let row=0; row<def.rows; row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
       }
     }, 70);
     intervals.push(iv);
@@ -579,7 +613,7 @@ function startSpinAnimation() {
 
 function stopReel(intervals, reelIndex, finalColSyms) {
   clearInterval(intervals[reelIndex]);
-  for (let row=0; row<3; row++) {
+  for (let row=0; row<def.rows; row++) {
     renderCell(cellMatrix[row][reelIndex], finalColSyms[row]);
   }
   stopTick();
@@ -589,29 +623,29 @@ function stopReel(intervals, reelIndex, finalColSyms) {
    Outcome generation
 ========================= */
 function generateOutcome() {
-  const grid = Array.from({length:3}, ()=>Array(5).fill(null));
+  const grid = Array.from({length:def.rows}, ()=>Array(def.reels).fill(null));
 
   if (def.reelMode === "stacked") {
-    for (let r=0; r<5; r++) {
+    for (let r=0; r<def.reels; r++) {
       const sym = randomSymbolFromBag();
-      for (let row=0; row<3; row++) grid[row][r] = sym;
+      for (let row=0; row<def.rows; row++) grid[row][r] = sym;
     }
     return grid;
   }
 
-  for (let r=0; r<5; r++) {
-    for (let row=0; row<3; row++) {
+  for (let r=0; r<def.reels; r++) {
+    for (let row=0; row<def.rows; row++) {
       grid[row][r] = randomSymbolFromBag();
     }
   }
   return grid;
 }
 
-/* Vollbild = 15 gleiche Symbole */
+/* Vollbild = rows*reels gleiche Symbole (bei 3x3 = 9) */
 function isFullScreen(grid){
   const first = grid[0][0];
-  for (let row=0; row<3; row++){
-    for (let r=0; r<5; r++){
+  for (let row=0; row<def.rows; row++){
+    for (let r=0; r<def.reels; r++){
       if (grid[row][r] !== first) return false;
     }
   }
@@ -620,6 +654,7 @@ function isFullScreen(grid){
 
 /* =========================
    Win evaluation (links->rechts)
+   - bei 3 Walzen gewinnt nur "3 gleiche"
 ========================= */
 function evaluate(grid, betPerLine) {
   const lines = enabledLines();
@@ -627,14 +662,16 @@ function evaluate(grid, betPerLine) {
   let totalWin = 0;
 
   for (const line of lines) {
-    const pattern = line.pattern;
+    const pattern = normalizePattern(line.pattern, def.reels);
     const first = grid[pattern[0]][0];
+
     let len = 1;
-    for (let r=1; r<5; r++) {
+    for (let r=1; r<def.reels; r++) {
       const sym = grid[pattern[r]][r];
       if (sym === first) len++;
       else break;
     }
+
     if (len >= 3) {
       const symObj = getSymbolById(first);
       const mult = symObj.pay[len] || 0;
@@ -691,9 +728,10 @@ function highlightWins(wins) {
 
 /* =========================
    Triple-Triple Chance Feature
+   - Grün: +Vollbild-Payout
+   - Rot: alles rot, pending = 0, Ende
 ========================= */
 function ttcOpen(basePayout){
-  // Auto stoppen, sonst eskaliert’s
   state.auto = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   saveCurrentState();
@@ -705,15 +743,15 @@ function ttcOpen(basePayout){
   ttc.greens = 0;
   ttc.round = 0;
 
-  ttc.maxRounds = clampInt(def.features?.ttMaxRounds ?? 10, 0, 99);
-  ttc.greensPerRound = clampInt(def.features?.ttGreens ?? 5, 1, 20);
+  ttc.maxRounds = clampInt(def.features?.ttMaxRounds ?? 0, 0, 99);
+  ttc.greensPerRound = clampInt(def.features?.ttGreens ?? 3, 1, 20);
   ttc.redsPerRound = clampInt(def.features?.ttReds ?? 1, 1, 20);
 
   ttcBaseEl.textContent = String(ttc.basePayout);
   ttcPendingEl.textContent = "0";
   ttcGreensEl.textContent = "0";
   ttcRoundEl.textContent = "0";
-  ttcMsg.textContent = "Start: SPIN-OFF drücken oder COLLECT (0)";
+  ttcMsg.textContent = "Start: SPIN-OFF drücken (Rot beendet alles)";
 
   renderTtcBoard(null);
   renderTtcLamps("reset");
@@ -733,7 +771,6 @@ function renderTtcBoard(pickIndex){
   for (let i=0;i<ttc.greensPerRound;i++) tiles.push("green");
   for (let i=0;i<ttc.redsPerRound;i++) tiles.push("red");
 
-  // shuffle
   for (let i = tiles.length - 1; i > 0; i--) {
     const j = randInt(i + 1);
     [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
@@ -747,11 +784,10 @@ function renderTtcBoard(pickIndex){
     ttcBoard.appendChild(d);
   });
 
-  return tiles; // return mapping for this round
+  return tiles;
 }
 
 function renderTtcLamps(mode){
-  // mode: "reset" | "green" | "red"
   if (mode === "reset") {
     ttcLamps.innerHTML = "";
     for (let i=0;i<12;i++){
@@ -764,9 +800,7 @@ function renderTtcLamps(mode){
 
   const lamps = Array.from(ttcLamps.querySelectorAll(".lamp"));
   if (mode === "green") {
-    if (ttc.greens - 1 < lamps.length) {
-      lamps[ttc.greens - 1].classList.add("green");
-    }
+    if (ttc.greens - 1 < lamps.length) lamps[ttc.greens - 1].classList.add("green");
   }
   if (mode === "red") {
     for (const l of lamps) {
@@ -778,10 +812,8 @@ function renderTtcLamps(mode){
 
 async function ttcSpin(){
   if (!ttc.active) return;
-
   ensureAudio();
 
-  // max rounds check (0 = unlimited)
   if (ttc.maxRounds > 0 && ttc.round >= ttc.maxRounds) {
     ttcMsg.textContent = "Max Runden erreicht → Auto-COLLECT.";
     ttcCollect();
@@ -806,7 +838,7 @@ async function ttcSpin(){
     ttcGreensEl.textContent = String(ttc.greens);
     renderTtcLamps("green");
 
-    ttcMsg.textContent = `✅ GRÜN! +${ttc.basePayout} Bonus (COLLECT oder weiter)`;
+    ttcMsg.textContent = `✅ GRÜN! +${ttc.basePayout} Bonus (weiter drehen oder collect)`;
     greenSound();
   } else {
     // Rot: alles wird rot & Bonus weg
@@ -817,7 +849,7 @@ async function ttcSpin(){
     ttcGreensEl.textContent = "0";
     renderTtcLamps("red");
 
-    ttcMsg.textContent = "🟥 ROT! Feature beendet. Bonus ist weg.";
+    ttcMsg.textContent = "🟥 ROT! Feature beendet. Alles Grün wurde rot (Bonus weg).";
     redSound();
 
     await wait(900);
@@ -843,7 +875,7 @@ function ttcCollect(){
 ttcSpinBtn.onclick = ttcSpin;
 ttcCollectBtn.onclick = ttcCollect;
 ttcModal.addEventListener("click", (e) => {
-  if (e.target === ttcModal) ttcCollect(); // click outside = collect
+  if (e.target === ttcModal) ttcCollect();
 });
 
 /* =========================
@@ -874,9 +906,10 @@ async function spinOnce() {
   const intervals = startSpinAnimation();
   const finalGrid = generateOutcome();
 
-  for (let r=0; r<5; r++) {
+  for (let r=0; r<def.reels; r++) {
     await wait(450 + r*220);
-    const colSyms = [finalGrid[0][r], finalGrid[1][r], finalGrid[2][r]];
+    const colSyms = [];
+    for (let row=0; row<def.rows; row++) colSyms.push(finalGrid[row][r]);
     stopReel(intervals, r, colSyms);
   }
 
@@ -894,9 +927,8 @@ async function spinOnce() {
     setMsg("Kein Gewinn. Versuch’s nochmal.");
   }
 
-  // ✅ Feature Trigger: Vollbild + TT Chance enabled
+  // Feature Trigger: Vollbild + enabled
   if (def.features?.ttChanceEnabled && isFullScreen(finalGrid)) {
-    // Vollbild-Payout = genau der Gewinn, der eben ausgezahlt wurde (alle Linien 5er)
     const base = Math.max(0, res.totalWin|0);
     if (base > 0) {
       await wait(450);
@@ -938,7 +970,7 @@ function simulate(spins = 10000) {
 }
 
 /* =========================
-   Builder UI
+   Builder UI (unverändert)
 ========================= */
 function tdInput(val, onChange) {
   const td = document.createElement("td");
@@ -973,11 +1005,10 @@ function renderBuilder() {
   bReelMode.value = def.reelMode === "stacked" ? "stacked" : "independent";
 
   bTTEnabled.checked = !!def.features?.ttChanceEnabled;
-  bTTGreens.value = String(def.features?.ttGreens ?? 5);
+  bTTGreens.value = String(def.features?.ttGreens ?? 3);
   bTTReds.value = String(def.features?.ttReds ?? 1);
-  bTTMaxRounds.value = String(def.features?.ttMaxRounds ?? 10);
+  bTTMaxRounds.value = String(def.features?.ttMaxRounds ?? 0);
 
-  // Lines
   bLines.innerHTML = "";
   def.lines.forEach((l, idx) => {
     const item = document.createElement("div");
@@ -989,7 +1020,7 @@ function renderBuilder() {
     cb.checked = !!l.enabled;
     cb.onchange = () => { def.lines[idx].enabled = cb.checked; };
     const txt = document.createElement("div");
-    txt.innerHTML = `<b>${l.name}</b><div style="color:var(--muted);font-size:12px;margin-top:2px;">Pattern: ${l.pattern.join("-")}</div>`;
+    txt.innerHTML = `<b>${l.name}</b><div style="color:var(--muted);font-size:12px;margin-top:2px;">Pattern: ${normalizePattern(l.pattern, def.reels).join("-")}</div>`;
     lab.appendChild(cb);
     lab.appendChild(txt);
 
@@ -1002,7 +1033,6 @@ function renderBuilder() {
     bLines.appendChild(item);
   });
 
-  // Symbols
   symbolTbody.innerHTML = "";
   def.symbols.forEach((s, idx) => {
     const tr = document.createElement("tr");
@@ -1052,14 +1082,13 @@ function applyBuilderToDef() {
   weightedBag = buildWeightedBag();
   applyAccent();
 
-  // Play refresh
   renderReels();
-  for (let r=0;r<5;r++){
+  for (let r=0;r<def.reels;r++){
     if (def.reelMode === "stacked") {
       const sym = randomSymbolFromBag();
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
     } else {
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
     }
   }
 
@@ -1144,17 +1173,15 @@ function switchSlot(id){
   renderSlotSelects();
   renderReels();
 
-  // initial fill
-  for (let r=0;r<5;r++){
+  for (let r=0;r<def.reels;r++){
     if (def.reelMode === "stacked") {
       const sym = randomSymbolFromBag();
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
     } else {
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
     }
   }
 
-  // stop auto + feature when switching
   state.auto = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   saveCurrentState();
@@ -1260,13 +1287,12 @@ function boot() {
   applyAdminUI();
   renderReels();
 
-  // initial fill
-  for (let r=0;r<5;r++){
+  for (let r=0;r<def.reels;r++){
     if (def.reelMode === "stacked") {
       const sym = randomSymbolFromBag();
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
     } else {
-      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
     }
   }
 
