@@ -1,37 +1,57 @@
-/* Slot Studio – Custom Slots (demo/arcade)
-   - Builder: Symbole, Gewichte, Payouts, Linien
-   - Play: 5x3, Multi-Lines, Gewinne links->rechts, WebAudio Sounds
+/* Slot Studio v2
+   - Admin gate: Ctrl+Alt+# + Code => Builder + RTP sichtbar
+   - Multi-Slots: mehrere Slot-Definitionen + Slot-Wechsel
+   - Triple-Triple Chance Feature: Trigger bei Vollbild (15 gleiche)
 */
 
 const $ = (id) => document.getElementById(id);
 
-/* ---------- Secure-ish RNG (Browser) ---------- */
+/* =========================
+   ADMIN (Client-side Gate)
+========================= */
+// ✅ ÄNDERE HIER deinen Admin-Code:
+const ADMIN_CODE = "1234"; // <-- mach hier deinen Code rein
+
+const LS_ADMIN = "slotStudio.admin.v1";
+let isAdmin = JSON.parse(localStorage.getItem(LS_ADMIN) || "false");
+
+/* ---------- RNG ---------- */
 function randInt(maxExclusive) {
   const a = new Uint32Array(1);
   crypto.getRandomValues(a);
   return a[0] % maxExclusive;
 }
-function choice(arr) {
-  return arr[randInt(arr.length)];
+function escapeHtml(str){
+  return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+}
+function looksLikeUrl(x) {
+  return typeof x === "string" && (x.startsWith("http://") || x.startsWith("https://") || x.startsWith("data:"));
 }
 
-/* ---------- Default Slot Definition ---------- */
+/* =========================
+   DEFAULT SLOTS
+========================= */
 const DEFAULT_DEF = {
   name: "Arcade Deluxe",
   startCredits: 200,
   accent: "#00e5ff",
   rows: 3,
   reels: 5,
-  // icon can be emoji OR URL (http/data). Emoji is easiest.
+  reelMode: "independent", // independent | stacked
+  features: {
+    ttChanceEnabled: false,
+    ttGreens: 5,
+    ttReds: 1,
+    ttMaxRounds: 10
+  },
   symbols: [
-    { id:"cherry", icon:"🍒", name:"Cherry", weight:18, pay:{3:5, 4:20, 5:120} },
-    { id:"lemon",  icon:"🍋", name:"Lemon",  weight:18, pay:{3:5, 4:18, 5:100} },
-    { id:"bell",   icon:"🔔", name:"Bell",   weight:14, pay:{3:8, 4:30, 5:160} },
-    { id:"star",   icon:"⭐", name:"Star",   weight:12, pay:{3:10,4:40, 5:220} },
-    { id:"diamond",icon:"💎", name:"Diamond",weight:8,  pay:{3:14,4:70, 5:350} },
-    { id:"seven",  icon:"7️⃣", name:"Seven", weight:4,  pay:{3:25,4:120,5:700} },
+    { id:"cherry", icon:"🍒", name:"Cherry",  weight:18, pay:{3:5, 4:20, 5:120} },
+    { id:"lemon",  icon:"🍋", name:"Lemon",   weight:18, pay:{3:5, 4:18, 5:100} },
+    { id:"bell",   icon:"🔔", name:"Bell",    weight:14, pay:{3:8, 4:30, 5:160} },
+    { id:"star",   icon:"⭐",  name:"Star",    weight:12, pay:{3:10,4:40, 5:220} },
+    { id:"diamond",icon:"💎",  name:"Diamond", weight:8,  pay:{3:14,4:70, 5:350} },
+    { id:"seven",  icon:"7️⃣", name:"Seven",   weight:4,  pay:{3:25,4:120,5:700} },
   ],
-  // payline = array of rowIndex for each reel (0..2) [left..right]
   lines: [
     { id:"mid",  name:"Middle", pattern:[1,1,1,1,1], enabled:true },
     { id:"top",  name:"Top",    pattern:[0,0,0,0,0], enabled:true },
@@ -43,43 +63,52 @@ const DEFAULT_DEF = {
   ]
 };
 
-/* ---------- Persistence ---------- */
-const LS_KEY = "slotStudio.def.v1";
-const LS_STATE = "slotStudio.state.v1";
+const TTC_DEF = {
+  ...structuredClone(DEFAULT_DEF),
+  name: "Triple-Triple Chance",
+  startCredits: 250,
+  accent: "#00ffb3",
+  reelMode: "stacked", // macht Vollbild realistischer
+  features: {
+    ttChanceEnabled: true,
+    ttGreens: 5,
+    ttReds: 1,
+    ttMaxRounds: 12
+  },
+  symbols: [
+    { id:"triple", icon:"🟩", name:"Triple",  weight:6,  pay:{3:20, 4:120, 5:900} },
+    { id:"bar",    icon:"🟥", name:"Bar",     weight:14, pay:{3:10, 4:50,  5:300} },
+    { id:"star",   icon:"⭐",  name:"Star",    weight:18, pay:{3:8,  4:40,  5:220} },
+    { id:"bell",   icon:"🔔", name:"Bell",    weight:22, pay:{3:6,  4:28,  5:150} },
+    { id:"lemon",  icon:"🍋", name:"Lemon",   weight:28, pay:{3:4,  4:16,  5:90}  },
+    { id:"cherry", icon:"🍒", name:"Cherry",  weight:28, pay:{3:4,  4:16,  5:90}  },
+  ]
+};
 
-function loadDef() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return structuredClone(DEFAULT_DEF);
-    const def = JSON.parse(raw);
-    return normalizeDef(def);
-  } catch {
-    return structuredClone(DEFAULT_DEF);
-  }
-}
-function saveDef(def) {
-  localStorage.setItem(LS_KEY, JSON.stringify(def, null, 2));
-}
-function loadState() {
-  try {
-    const raw = localStorage.getItem(LS_STATE);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch { return null; }
-}
-function saveState(state) {
-  localStorage.setItem(LS_STATE, JSON.stringify(state));
-}
+/* =========================
+   STORAGE (Multi Slots)
+========================= */
+const LS_SLOTS_KEY = "slotStudio.slots.v2";
+const LS_CURRENT_SLOT = "slotStudio.currentSlotId.v2";
+const LS_STATE_MAP = "slotStudio.stateMap.v2";
 
-/* ---------- Normalize / Validate minimal ---------- */
 function normalizeDef(def) {
-  const out = structuredClone(DEFAULT_DEF);
+  const base = structuredClone(DEFAULT_DEF);
+  const out = structuredClone(base);
 
   if (def && typeof def === "object") {
     out.name = String(def.name ?? out.name);
     out.startCredits = Math.max(0, Number(def.startCredits ?? out.startCredits) | 0);
     out.accent = String(def.accent ?? out.accent);
     out.rows = 3; out.reels = 5;
+    out.reelMode = (def.reelMode === "stacked") ? "stacked" : "independent";
+
+    out.features = {
+      ttChanceEnabled: !!def.features?.ttChanceEnabled,
+      ttGreens: clampInt(def.features?.ttGreens ?? 5, 1, 20),
+      ttReds: clampInt(def.features?.ttReds ?? 1, 1, 20),
+      ttMaxRounds: clampInt(def.features?.ttMaxRounds ?? 10, 0, 99)
+    };
 
     if (Array.isArray(def.symbols) && def.symbols.length >= 3) {
       out.symbols = def.symbols.map((s, i) => ({
@@ -99,7 +128,7 @@ function normalizeDef(def) {
       out.lines = def.lines.map((l, i) => ({
         id: String(l.id ?? `l${i}`),
         name: String(l.name ?? `Line ${i+1}`),
-        pattern: Array.isArray(l.pattern) && l.pattern.length === 5 ? l.pattern.map(n => clampRow(n)) : [1,1,1,1,1],
+        pattern: Array.isArray(l.pattern) && l.pattern.length === 5 ? l.pattern.map(clampRow) : [1,1,1,1,1],
         enabled: !!l.enabled
       }));
     }
@@ -111,15 +140,131 @@ function clampRow(n) {
   if (Number.isNaN(n)) return 1;
   return Math.min(2, Math.max(0, n|0));
 }
+function clampInt(v, min, max){
+  v = Number(v);
+  if (Number.isNaN(v)) v = min;
+  v = v|0;
+  return Math.max(min, Math.min(max, v));
+}
 
-/* ---------- Sounds (WebAudio Synth) ---------- */
+function loadSlots() {
+  try {
+    const raw = localStorage.getItem(LS_SLOTS_KEY);
+    if (!raw) {
+      const init = [
+        { id: "slot_arcade", def: normalizeDef(DEFAULT_DEF) },
+        { id: "slot_ttc", def: normalizeDef(TTC_DEF) }
+      ];
+      localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(init));
+      return init;
+    }
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr) || arr.length === 0) throw new Error("bad slots");
+    return arr.map(s => ({ id: String(s.id), def: normalizeDef(s.def) }));
+  } catch {
+    const init = [
+      { id: "slot_arcade", def: normalizeDef(DEFAULT_DEF) },
+      { id: "slot_ttc", def: normalizeDef(TTC_DEF) }
+    ];
+    localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(init));
+    return init;
+  }
+}
+function saveSlots() {
+  localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(slots, null, 2));
+}
+
+function loadStateMap() {
+  try {
+    const raw = localStorage.getItem(LS_STATE_MAP);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === "object") ? obj : {};
+  } catch { return {}; }
+}
+function saveStateMap() {
+  localStorage.setItem(LS_STATE_MAP, JSON.stringify(stateMap));
+}
+
+/* =========================
+   DOM refs
+========================= */
+const tabPlay = $("tabPlay");
+const tabBuilder = $("tabBuilder");
+const viewPlay = $("viewPlay");
+const viewBuilder = $("viewBuilder");
+
+const slotNameEl = $("slotName");
+const slotSelect = $("slotSelect");
+const adminPill = $("adminPill");
+
+const creditsEl = $("credits");
+const betPerLineEl = $("betPerLine");
+const lineCountEl = $("lineCount");
+const reelsEl = $("reels");
+const msgEl = $("msg");
+const winsEl = $("wins");
+
+const spinBtn = $("spinBtn");
+const autoBtn = $("autoBtn");
+const simBtn = $("simBtn");
+const betDown = $("betDown");
+const betUp = $("betUp");
+const soundToggle = $("soundToggle");
+const resetCredits = $("resetCredits");
+
+/* Builder */
+const bSlotSelect = $("bSlotSelect");
+const newSlotBtn = $("newSlotBtn");
+const dupSlotBtn = $("dupSlotBtn");
+const delSlotBtn = $("delSlotBtn");
+
+const bName = $("bName");
+const bStartCredits = $("bStartCredits");
+const bAccent = $("bAccent");
+const bReelMode = $("bReelMode");
+
+const bTTEnabled = $("bTTEnabled");
+const bTTGreens = $("bTTGreens");
+const bTTReds = $("bTTReds");
+const bTTMaxRounds = $("bTTMaxRounds");
+
+const bLines = $("bLines");
+const symbolTbody = $("symbolTbody");
+const addSymbolBtn = $("addSymbol");
+const exportBtn = $("exportBtn");
+const importBtn = $("importBtn");
+const saveBtn = $("saveBtn");
+const jsonBox = $("jsonBox");
+
+/* Admin modal */
+const adminModal = $("adminModal");
+const adminCode = $("adminCode");
+const adminUnlockBtn = $("adminUnlockBtn");
+const adminLogoutBtn = $("adminLogoutBtn");
+const adminCloseBtn = $("adminCloseBtn");
+const adminStatus = $("adminStatus");
+
+/* TTC modal */
+const ttcModal = $("ttcModal");
+const ttcBaseEl = $("ttcBase");
+const ttcPendingEl = $("ttcPending");
+const ttcGreensEl = $("ttcGreens");
+const ttcRoundEl = $("ttcRound");
+const ttcBoard = $("ttcBoard");
+const ttcLamps = $("ttcLamps");
+const ttcSpinBtn = $("ttcSpinBtn");
+const ttcCollectBtn = $("ttcCollectBtn");
+const ttcMsg = $("ttcMsg");
+
+/* =========================
+   Sounds (WebAudio)
+========================= */
 let audioOn = true;
 let AC = null;
 
 function ensureAudio() {
-  if (!AC) {
-    AC = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
 }
 function beep(freq, durMs, type="sine", gain=0.06) {
   if (!audioOn) return;
@@ -144,53 +289,210 @@ function winJingle() {
 }
 function spinTick() { beep(160, 35, "square", 0.03); }
 function stopTick() { beep(220, 70, "sawtooth", 0.04); }
+function greenSound(){ beep(880, 90, "triangle", 0.08); }
+function redSound(){ beep(140, 160, "sawtooth", 0.09); }
 
-/* ---------- App State ---------- */
-let def = loadDef();
-let state = loadState() || {
-  credits: def.startCredits,
-  betPerLine: 1,
-  auto: false
-};
+/* =========================
+   Runtime State
+========================= */
+let slots = loadSlots();
+let currentSlotId = localStorage.getItem(LS_CURRENT_SLOT) || slots[0].id;
+
+let stateMap = loadStateMap();
+let def = getCurrentDef();
+let state = getCurrentState();
+
+let weightedBag = buildWeightedBag();
+
+let cellMatrix = []; // [row][reel] => element
 let spinning = false;
 let autoTimer = null;
 
-/* ---------- DOM refs ---------- */
-const tabPlay = $("tabPlay");
-const tabBuilder = $("tabBuilder");
-const viewPlay = $("viewPlay");
-const viewBuilder = $("viewBuilder");
+/* TTC Feature state */
+let ttc = {
+  active: false,
+  basePayout: 0,
+  pending: 0,
+  greens: 0,
+  round: 0,
+  maxRounds: 10,
+  greensPerRound: 5,
+  redsPerRound: 1
+};
 
-const slotNameEl = $("slotName");
-const creditsEl = $("credits");
-const betPerLineEl = $("betPerLine");
-const lineCountEl = $("lineCount");
-const reelsEl = $("reels");
-const msgEl = $("msg");
-const winsEl = $("wins");
+/* =========================
+   Helpers
+========================= */
+function getCurrentDef(){
+  const slot = slots.find(s => s.id === currentSlotId) || slots[0];
+  currentSlotId = slot.id;
+  return slot.def;
+}
+function setCurrentDef(newDef){
+  const idx = slots.findIndex(s => s.id === currentSlotId);
+  if (idx >= 0) {
+    slots[idx].def = normalizeDef(newDef);
+    def = slots[idx].def;
+    saveSlots();
+  }
+}
+function getCurrentState(){
+  const st = stateMap[currentSlotId];
+  if (st && typeof st.credits === "number") return st;
 
-const spinBtn = $("spinBtn");
-const autoBtn = $("autoBtn");
-const simBtn = $("simBtn");
-const betDown = $("betDown");
-const betUp = $("betUp");
-const soundToggle = $("soundToggle");
-const resetCredits = $("resetCredits");
+  const init = { credits: def.startCredits, betPerLine: 1, auto: false };
+  stateMap[currentSlotId] = init;
+  saveStateMap();
+  return init;
+}
+function saveCurrentState(){
+  stateMap[currentSlotId] = state;
+  saveStateMap();
+}
 
-/* Builder */
-const bName = $("bName");
-const bStartCredits = $("bStartCredits");
-const bAccent = $("bAccent");
-const bLines = $("bLines");
-const symbolTbody = $("symbolTbody");
-const addSymbolBtn = $("addSymbol");
-const exportBtn = $("exportBtn");
-const importBtn = $("importBtn");
-const saveBtn = $("saveBtn");
-const jsonBox = $("jsonBox");
+function setMsg(t){ msgEl.textContent = t; }
 
-/* ---------- Render Grid ---------- */
-let cellMatrix = []; // [row][reel] => element
+function applyAccent() {
+  document.documentElement.style.setProperty("--accent", def.accent || "#00e5ff");
+}
+function enabledLines() {
+  return def.lines.filter(l => l.enabled);
+}
+function getSymbolById(id) {
+  return def.symbols.find(s => s.id === id) || def.symbols[0];
+}
+function renderCell(cell, symId) {
+  const s = getSymbolById(symId);
+  const iconEl = cell.querySelector(".icon");
+  const labelEl = cell.querySelector(".label");
+
+  if (looksLikeUrl(s.icon)) {
+    iconEl.textContent = "";
+    iconEl.style.fontSize = "0px";
+    iconEl.innerHTML = `<img alt="" src="${escapeHtml(s.icon)}" style="width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));" />`;
+  } else {
+    iconEl.style.fontSize = "";
+    iconEl.textContent = s.icon || "❓";
+  }
+  labelEl.textContent = s.name || "";
+}
+
+function buildWeightedBag() {
+  const bag = [];
+  for (const s of def.symbols) {
+    const w = Math.max(1, s.weight|0);
+    for (let i=0;i<w;i++) bag.push(s.id);
+  }
+  return bag.length ? bag : def.symbols.map(s=>s.id);
+}
+function randomSymbolFromBag() {
+  return weightedBag[randInt(weightedBag.length)];
+}
+function wait(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+/* =========================
+   UI: Slot select + Admin UI
+========================= */
+function renderSlotSelects(){
+  slotSelect.innerHTML = "";
+  bSlotSelect.innerHTML = "";
+
+  for (const s of slots) {
+    const opt1 = document.createElement("option");
+    opt1.value = s.id;
+    opt1.textContent = s.def.name;
+    if (s.id === currentSlotId) opt1.selected = true;
+    slotSelect.appendChild(opt1);
+
+    const opt2 = document.createElement("option");
+    opt2.value = s.id;
+    opt2.textContent = s.def.name;
+    if (s.id === currentSlotId) opt2.selected = true;
+    bSlotSelect.appendChild(opt2);
+  }
+}
+function applyAdminUI(){
+  tabBuilder.classList.toggle("hidden", !isAdmin);
+  simBtn.classList.toggle("hidden", !isAdmin);
+  adminPill.classList.toggle("hidden", !isAdmin);
+
+  // wenn nicht admin und gerade im builder -> zurück zu play
+  if (!isAdmin && !viewBuilder.classList.contains("hidden")) {
+    showPlay();
+  }
+}
+
+function openAdminModal(){
+  adminModal.classList.remove("hidden");
+  adminCode.value = "";
+  adminStatus.textContent = isAdmin ? "Status: Admin ist aktiv." : "Status: Admin ist NICHT aktiv.";
+  adminCode.focus();
+}
+function closeAdminModal(){
+  adminModal.classList.add("hidden");
+}
+
+/* Ctrl+Alt+# (oder Ctrl+Alt+3) */
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey && e.altKey)) return;
+
+  const keyIsHash =
+    e.key === "#" ||
+    (e.code === "Digit3") || // viele layouts
+    (e.key === "3");         // fallback
+
+  if (keyIsHash) {
+    e.preventDefault();
+    openAdminModal();
+  }
+});
+
+adminUnlockBtn.onclick = () => {
+  if (adminCode.value === ADMIN_CODE) {
+    isAdmin = true;
+    localStorage.setItem(LS_ADMIN, "true");
+    adminStatus.textContent = "✅ Admin freigeschaltet.";
+    applyAdminUI();
+    beep(700, 120, "triangle", 0.08);
+  } else {
+    adminStatus.textContent = "❌ Falscher Code.";
+    beep(200, 160, "sawtooth", 0.06);
+  }
+};
+adminLogoutBtn.onclick = () => {
+  isAdmin = false;
+  localStorage.setItem(LS_ADMIN, "false");
+  adminStatus.textContent = "Logout: Admin deaktiviert.";
+  applyAdminUI();
+};
+adminCloseBtn.onclick = closeAdminModal;
+adminModal.addEventListener("click", (e) => {
+  if (e.target === adminModal) closeAdminModal();
+});
+
+/* =========================
+   Tabs
+========================= */
+function showPlay() {
+  tabPlay.classList.add("active");
+  tabBuilder.classList.remove("active");
+  viewPlay.classList.remove("hidden");
+  viewBuilder.classList.add("hidden");
+}
+function showBuilder() {
+  if (!isAdmin) return; // hard block
+  tabBuilder.classList.add("active");
+  tabPlay.classList.remove("active");
+  viewBuilder.classList.remove("hidden");
+  viewPlay.classList.add("hidden");
+  renderBuilder();
+}
+tabPlay.onclick = showPlay;
+tabBuilder.onclick = showBuilder;
+
+/* =========================
+   Render reels
+========================= */
 function renderReels() {
   reelsEl.innerHTML = "";
   cellMatrix = Array.from({length:3}, ()=>Array(5).fill(null));
@@ -213,66 +515,13 @@ function renderReels() {
 
       cell.appendChild(icon);
       cell.appendChild(label);
-
       col.appendChild(cell);
       cellMatrix[row][r] = cell;
     }
-
     reelsEl.appendChild(col);
   }
 }
 
-/* ---------- Symbol helpers ---------- */
-function getSymbolById(id) {
-  return def.symbols.find(s => s.id === id) || def.symbols[0];
-}
-function renderCell(cell, symId) {
-  const s = getSymbolById(symId);
-  const iconEl = cell.querySelector(".icon");
-  const labelEl = cell.querySelector(".label");
-
-  if (looksLikeUrl(s.icon)) {
-    iconEl.textContent = "";
-    iconEl.style.fontSize = "0px";
-    iconEl.innerHTML = `<img alt="" src="${escapeHtml(s.icon)}" style="width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));" />`;
-  } else {
-    iconEl.style.fontSize = "";
-    iconEl.textContent = s.icon || "❓";
-  }
-  labelEl.textContent = s.name || "";
-}
-function looksLikeUrl(x) {
-  return typeof x === "string" && (x.startsWith("http://") || x.startsWith("https://") || x.startsWith("data:"));
-}
-function escapeHtml(str){
-  return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
-}
-
-/* ---------- Weighted pick list for spinning preview ---------- */
-function buildWeightedBag() {
-  const bag = [];
-  for (const s of def.symbols) {
-    const w = Math.max(1, s.weight|0);
-    for (let i=0;i<w;i++) bag.push(s.id);
-  }
-  return bag.length ? bag : def.symbols.map(s=>s.id);
-}
-let weightedBag = buildWeightedBag();
-
-function randomSymbolFromBag() {
-  return weightedBag[randInt(weightedBag.length)];
-}
-
-/* ---------- Lines ---------- */
-function enabledLines() {
-  return def.lines.filter(l => l.enabled);
-}
-
-/* ---------- UI sync ---------- */
-function applyAccent() {
-  document.documentElement.style.setProperty("--accent", def.accent || "#00e5ff");
-}
-function setMsg(t) { msgEl.textContent = t; }
 function syncHUD() {
   slotNameEl.textContent = def.name;
   creditsEl.textContent = String(state.credits);
@@ -282,7 +531,6 @@ function syncHUD() {
   soundToggle.textContent = audioOn ? "ON" : "OFF";
 }
 
-/* ---------- Highlight helpers ---------- */
 function clearHighlights() {
   for (let row=0; row<3; row++) {
     for (let r=0; r<5; r++) {
@@ -299,7 +547,9 @@ function dimAllExcept(coordsSet) {
   }
 }
 
-/* ---------- Spin Animation (simple, reliable) ---------- */
+/* =========================
+   Spin animation
+========================= */
 function startSpinAnimation() {
   clearHighlights();
   winsEl.innerHTML = "";
@@ -309,15 +559,17 @@ function startSpinAnimation() {
   betDown.disabled = true;
   betUp.disabled = true;
 
-  // quick tick at start
   spinTick();
 
-  // start “rolling” preview
   const intervals = [];
   for (let r=0; r<5; r++) {
     const iv = setInterval(() => {
-      for (let row=0; row<3; row++) {
-        renderCell(cellMatrix[row][r], randomSymbolFromBag());
+      // Preview: abhängig vom Reel Mode
+      if (def.reelMode === "stacked") {
+        const sym = randomSymbolFromBag();
+        for (let row=0; row<3; row++) renderCell(cellMatrix[row][r], sym);
+      } else {
+        for (let row=0; row<3; row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
       }
     }, 70);
     intervals.push(iv);
@@ -333,10 +585,20 @@ function stopReel(intervals, reelIndex, finalColSyms) {
   stopTick();
 }
 
-/* ---------- Outcome generation ---------- */
+/* =========================
+   Outcome generation
+========================= */
 function generateOutcome() {
-  // returns grid [row][reel] => symId
   const grid = Array.from({length:3}, ()=>Array(5).fill(null));
+
+  if (def.reelMode === "stacked") {
+    for (let r=0; r<5; r++) {
+      const sym = randomSymbolFromBag();
+      for (let row=0; row<3; row++) grid[row][r] = sym;
+    }
+    return grid;
+  }
+
   for (let r=0; r<5; r++) {
     for (let row=0; row<3; row++) {
       grid[row][r] = randomSymbolFromBag();
@@ -345,14 +607,27 @@ function generateOutcome() {
   return grid;
 }
 
-/* ---------- Win evaluation (left->right, consecutive matches, len>=3) ---------- */
+/* Vollbild = 15 gleiche Symbole */
+function isFullScreen(grid){
+  const first = grid[0][0];
+  for (let row=0; row<3; row++){
+    for (let r=0; r<5; r++){
+      if (grid[row][r] !== first) return false;
+    }
+  }
+  return true;
+}
+
+/* =========================
+   Win evaluation (links->rechts)
+========================= */
 function evaluate(grid, betPerLine) {
   const lines = enabledLines();
   const wins = [];
   let totalWin = 0;
 
   for (const line of lines) {
-    const pattern = line.pattern; // row for each reel
+    const pattern = line.pattern;
     const first = grid[pattern[0]][0];
     let len = 1;
     for (let r=1; r<5; r++) {
@@ -375,73 +650,13 @@ function evaluate(grid, betPerLine) {
           len,
           mult,
           amount,
-          coords: pattern.map((row, r)=>({row, r})).slice(0, len) // only matched segment
+          coords: pattern.map((row, r)=>({row, r})).slice(0, len)
         });
       }
     }
   }
 
   return { wins, totalWin };
-}
-
-/* ---------- Play flow ---------- */
-async function spinOnce() {
-  if (spinning) return;
-
-  const lines = enabledLines();
-  if (lines.length === 0) {
-    setMsg("Aktiviere mindestens 1 Linie im Builder.");
-    return;
-  }
-
-  const totalBet = state.betPerLine * lines.length;
-  if (state.credits < totalBet) {
-    setMsg(`Zu wenig Credits. Du brauchst ${totalBet}.`);
-    return;
-  }
-
-  // On iOS/Chrome: audio context needs user gesture; this click is one.
-  if (audioOn) ensureAudio();
-
-  spinning = true;
-  state.credits -= totalBet;
-  saveState(state);
-  syncHUD();
-
-  const intervals = startSpinAnimation();
-
-  const finalGrid = generateOutcome();
-
-  // Stop reels with stagger
-  for (let r=0; r<5; r++) {
-    await wait(450 + r*220);
-    const colSyms = [finalGrid[0][r], finalGrid[1][r], finalGrid[2][r]];
-    stopReel(intervals, r, colSyms);
-  }
-
-  // Evaluate
-  const res = evaluate(finalGrid, state.betPerLine);
-  if (res.totalWin > 0) {
-    state.credits += res.totalWin;
-    saveState(state);
-    syncHUD();
-    setMsg(`WIN: +${res.totalWin} Credits`);
-    winJingle();
-    renderWins(res.wins);
-    highlightWins(res.wins);
-  } else {
-    setMsg("Kein Gewinn. Versuch’s nochmal.");
-  }
-
-  spinBtn.disabled = false;
-  simBtn.disabled = false;
-  betDown.disabled = false;
-  betUp.disabled = false;
-  spinning = false;
-
-  if (state.auto) {
-    autoTimer = setTimeout(spinOnce, 350);
-  }
 }
 
 function renderWins(wins) {
@@ -464,13 +679,9 @@ function highlightWins(wins) {
   clearHighlights();
   if (!wins.length) return;
 
-  // collect all coords that are part of any win
   const set = new Set();
-  for (const w of wins) {
-    for (const c of w.coords) set.add(`${c.row},${c.r}`);
-  }
+  for (const w of wins) for (const c of w.coords) set.add(`${c.row},${c.r}`);
 
-  // mark
   for (const key of set) {
     const [row, r] = key.split(",").map(Number);
     cellMatrix[row][r].classList.add("win");
@@ -478,7 +689,233 @@ function highlightWins(wins) {
   dimAllExcept(set);
 }
 
-/* ---------- RTP sim (quick estimate) ---------- */
+/* =========================
+   Triple-Triple Chance Feature
+========================= */
+function ttcOpen(basePayout){
+  // Auto stoppen, sonst eskaliert’s
+  state.auto = false;
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+  saveCurrentState();
+  syncHUD();
+
+  ttc.active = true;
+  ttc.basePayout = Math.max(0, basePayout|0);
+  ttc.pending = 0;
+  ttc.greens = 0;
+  ttc.round = 0;
+
+  ttc.maxRounds = clampInt(def.features?.ttMaxRounds ?? 10, 0, 99);
+  ttc.greensPerRound = clampInt(def.features?.ttGreens ?? 5, 1, 20);
+  ttc.redsPerRound = clampInt(def.features?.ttReds ?? 1, 1, 20);
+
+  ttcBaseEl.textContent = String(ttc.basePayout);
+  ttcPendingEl.textContent = "0";
+  ttcGreensEl.textContent = "0";
+  ttcRoundEl.textContent = "0";
+  ttcMsg.textContent = "Start: SPIN-OFF drücken oder COLLECT (0)";
+
+  renderTtcBoard(null);
+  renderTtcLamps("reset");
+
+  ttcModal.classList.remove("hidden");
+}
+
+function ttcClose(){
+  ttc.active = false;
+  ttcModal.classList.add("hidden");
+}
+
+function renderTtcBoard(pickIndex){
+  const totalTiles = ttc.greensPerRound + ttc.redsPerRound;
+  const tiles = [];
+
+  for (let i=0;i<ttc.greensPerRound;i++) tiles.push("green");
+  for (let i=0;i<ttc.redsPerRound;i++) tiles.push("red");
+
+  // shuffle
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+
+  ttcBoard.innerHTML = "";
+  tiles.forEach((type, idx) => {
+    const d = document.createElement("div");
+    d.className = `ttcTile ${type}` + (pickIndex === idx ? " pick" : "");
+    d.textContent = type === "green" ? "GRÜN" : "ROT";
+    ttcBoard.appendChild(d);
+  });
+
+  return tiles; // return mapping for this round
+}
+
+function renderTtcLamps(mode){
+  // mode: "reset" | "green" | "red"
+  if (mode === "reset") {
+    ttcLamps.innerHTML = "";
+    for (let i=0;i<12;i++){
+      const l = document.createElement("div");
+      l.className = "lamp";
+      ttcLamps.appendChild(l);
+    }
+    return;
+  }
+
+  const lamps = Array.from(ttcLamps.querySelectorAll(".lamp"));
+  if (mode === "green") {
+    if (ttc.greens - 1 < lamps.length) {
+      lamps[ttc.greens - 1].classList.add("green");
+    }
+  }
+  if (mode === "red") {
+    for (const l of lamps) {
+      l.classList.remove("green");
+      l.classList.add("red");
+    }
+  }
+}
+
+async function ttcSpin(){
+  if (!ttc.active) return;
+
+  ensureAudio();
+
+  // max rounds check (0 = unlimited)
+  if (ttc.maxRounds > 0 && ttc.round >= ttc.maxRounds) {
+    ttcMsg.textContent = "Max Runden erreicht → Auto-COLLECT.";
+    ttcCollect();
+    return;
+  }
+
+  ttc.round++;
+  ttcRoundEl.textContent = String(ttc.round);
+
+  const totalTiles = ttc.greensPerRound + ttc.redsPerRound;
+  const pick = randInt(totalTiles);
+
+  const mapping = renderTtcBoard(pick);
+  await wait(80);
+
+  const result = mapping[pick];
+  if (result === "green") {
+    ttc.greens++;
+    ttc.pending += ttc.basePayout;
+
+    ttcPendingEl.textContent = String(ttc.pending);
+    ttcGreensEl.textContent = String(ttc.greens);
+    renderTtcLamps("green");
+
+    ttcMsg.textContent = `✅ GRÜN! +${ttc.basePayout} Bonus (COLLECT oder weiter)`;
+    greenSound();
+  } else {
+    // Rot: alles wird rot & Bonus weg
+    ttc.pending = 0;
+    ttc.greens = 0;
+
+    ttcPendingEl.textContent = "0";
+    ttcGreensEl.textContent = "0";
+    renderTtcLamps("red");
+
+    ttcMsg.textContent = "🟥 ROT! Feature beendet. Bonus ist weg.";
+    redSound();
+
+    await wait(900);
+    ttcClose();
+  }
+}
+
+function ttcCollect(){
+  if (!ttc.active) return;
+
+  if (ttc.pending > 0) {
+    state.credits += ttc.pending;
+    saveCurrentState();
+    syncHUD();
+    setMsg(`COLLECT: +${ttc.pending} (Triple-Triple Chance)`);
+  } else {
+    setMsg("Triple-Triple Chance: nichts zu collecten.");
+  }
+
+  ttcClose();
+}
+
+ttcSpinBtn.onclick = ttcSpin;
+ttcCollectBtn.onclick = ttcCollect;
+ttcModal.addEventListener("click", (e) => {
+  if (e.target === ttcModal) ttcCollect(); // click outside = collect
+});
+
+/* =========================
+   Play flow
+========================= */
+async function spinOnce() {
+  if (spinning || ttc.active) return;
+
+  const lines = enabledLines();
+  if (lines.length === 0) {
+    setMsg("Aktiviere mindestens 1 Linie im Builder (Admin).");
+    return;
+  }
+
+  const totalBet = state.betPerLine * lines.length;
+  if (state.credits < totalBet) {
+    setMsg(`Zu wenig Credits. Du brauchst ${totalBet}.`);
+    return;
+  }
+
+  if (audioOn) ensureAudio();
+
+  spinning = true;
+  state.credits -= totalBet;
+  saveCurrentState();
+  syncHUD();
+
+  const intervals = startSpinAnimation();
+  const finalGrid = generateOutcome();
+
+  for (let r=0; r<5; r++) {
+    await wait(450 + r*220);
+    const colSyms = [finalGrid[0][r], finalGrid[1][r], finalGrid[2][r]];
+    stopReel(intervals, r, colSyms);
+  }
+
+  const res = evaluate(finalGrid, state.betPerLine);
+
+  if (res.totalWin > 0) {
+    state.credits += res.totalWin;
+    saveCurrentState();
+    syncHUD();
+    setMsg(`WIN: +${res.totalWin} Credits`);
+    winJingle();
+    renderWins(res.wins);
+    highlightWins(res.wins);
+  } else {
+    setMsg("Kein Gewinn. Versuch’s nochmal.");
+  }
+
+  // ✅ Feature Trigger: Vollbild + TT Chance enabled
+  if (def.features?.ttChanceEnabled && isFullScreen(finalGrid)) {
+    // Vollbild-Payout = genau der Gewinn, der eben ausgezahlt wurde (alle Linien 5er)
+    const base = Math.max(0, res.totalWin|0);
+    if (base > 0) {
+      await wait(450);
+      ttcOpen(base);
+    }
+  }
+
+  spinBtn.disabled = false;
+  simBtn.disabled = false;
+  betDown.disabled = false;
+  betUp.disabled = false;
+  spinning = false;
+
+  if (state.auto && !ttc.active) {
+    autoTimer = setTimeout(spinOnce, 350);
+  }
+}
+
+/* RTP sim (Admin only button visible anyway) */
 function simulate(spins = 10000) {
   const lines = enabledLines();
   if (lines.length === 0) {
@@ -500,11 +937,45 @@ function simulate(spins = 10000) {
   setMsg(`RTP Test (${spins} Spins): ca. ${rtp.toFixed(2)}% (Gewonnen ${won} / Einsatz ${wagered})`);
 }
 
-/* ---------- Builder UI ---------- */
+/* =========================
+   Builder UI
+========================= */
+function tdInput(val, onChange) {
+  const td = document.createElement("td");
+  const inp = document.createElement("input");
+  inp.value = String(val ?? "");
+  inp.oninput = () => onChange(inp.value);
+  td.appendChild(inp);
+  return td;
+}
+function tdInputNum(val, min, max, onChange) {
+  const td = document.createElement("td");
+  const inp = document.createElement("input");
+  inp.type = "number";
+  inp.min = String(min);
+  inp.max = String(max);
+  inp.step = "1";
+  inp.value = String(val ?? 0);
+  inp.oninput = () => {
+    const v = Math.max(min, Math.min(max, Number(inp.value)|0));
+    onChange(v);
+  };
+  td.appendChild(inp);
+  return td;
+}
+
 function renderBuilder() {
+  if (!isAdmin) return;
+
   bName.value = def.name;
   bStartCredits.value = String(def.startCredits);
   bAccent.value = def.accent;
+  bReelMode.value = def.reelMode === "stacked" ? "stacked" : "independent";
+
+  bTTEnabled.checked = !!def.features?.ttChanceEnabled;
+  bTTGreens.value = String(def.features?.ttGreens ?? 5);
+  bTTReds.value = String(def.features?.ttReds ?? 1);
+  bTTMaxRounds.value = String(def.features?.ttMaxRounds ?? 10);
 
   // Lines
   bLines.innerHTML = "";
@@ -531,7 +1002,7 @@ function renderBuilder() {
     bLines.appendChild(item);
   });
 
-  // Symbols table
+  // Symbols
   symbolTbody.innerHTML = "";
   def.symbols.forEach((s, idx) => {
     const tr = document.createElement("tr");
@@ -561,79 +1032,144 @@ function renderBuilder() {
   jsonBox.value = JSON.stringify(def, null, 2);
 }
 
-function tdInput(val, onChange) {
-  const td = document.createElement("td");
-  const inp = document.createElement("input");
-  inp.value = String(val ?? "");
-  inp.oninput = () => onChange(inp.value);
-  td.appendChild(inp);
-  return td;
-}
-function tdInputNum(val, min, max, onChange) {
-  const td = document.createElement("td");
-  const inp = document.createElement("input");
-  inp.type = "number";
-  inp.min = String(min);
-  inp.max = String(max);
-  inp.step = "1";
-  inp.value = String(val ?? 0);
-  inp.oninput = () => {
-    const v = Math.max(min, Math.min(max, Number(inp.value)|0));
-    onChange(v);
-  };
-  td.appendChild(inp);
-  return td;
-}
-
 function applyBuilderToDef() {
+  if (!isAdmin) return;
+
   def.name = String(bName.value || "My Slot");
   def.startCredits = Math.max(0, Number(bStartCredits.value)|0);
   def.accent = String(bAccent.value || "#00e5ff");
+  def.reelMode = (bReelMode.value === "stacked") ? "stacked" : "independent";
 
-  // normalize & rebuild bag
+  def.features = def.features || {};
+  def.features.ttChanceEnabled = !!bTTEnabled.checked;
+  def.features.ttGreens = clampInt(bTTGreens.value, 1, 20);
+  def.features.ttReds = clampInt(bTTReds.value, 1, 20);
+  def.features.ttMaxRounds = clampInt(bTTMaxRounds.value, 0, 99);
+
   def = normalizeDef(def);
+  setCurrentDef(def);
+
   weightedBag = buildWeightedBag();
   applyAccent();
-  saveDef(def);
 
-  // if user had no state yet or wants reset: we keep current credits unless user hits reset
-  if (!state || typeof state.credits !== "number") {
-    state = { credits: def.startCredits, betPerLine: 1, auto:false };
-  }
-  saveState(state);
-
-  // re-render play
+  // Play refresh
   renderReels();
-  // fill initial random grid
-  for (let r=0;r<5;r++) for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+  for (let r=0;r<5;r++){
+    if (def.reelMode === "stacked") {
+      const sym = randomSymbolFromBag();
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+    } else {
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+    }
+  }
+
+  renderSlotSelects();
   syncHUD();
   setMsg("Builder gespeichert. Play ist aktualisiert.");
 }
 
-/* ---------- Tabs ---------- */
-function showPlay() {
-  tabPlay.classList.add("active");
-  tabBuilder.classList.remove("active");
-  viewPlay.classList.remove("hidden");
-  viewBuilder.classList.add("hidden");
+/* Slot management (Admin) */
+function createNewSlot(){
+  const id = `slot_${Date.now()}`;
+  const newDef = normalizeDef({ ...structuredClone(DEFAULT_DEF), name: `New Slot ${slots.length+1}` });
+  slots.push({ id, def: newDef });
+  saveSlots();
+  currentSlotId = id;
+  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
+
+  def = getCurrentDef();
+  weightedBag = buildWeightedBag();
+  state = { credits: def.startCredits, betPerLine: 1, auto: false };
+  stateMap[currentSlotId] = state;
+  saveStateMap();
+
+  applyAccent();
+  renderSlotSelects();
+  renderReels();
+  syncHUD();
+  renderBuilder();
 }
-function showBuilder() {
-  tabBuilder.classList.add("active");
-  tabPlay.classList.remove("active");
-  viewBuilder.classList.remove("hidden");
-  viewPlay.classList.add("hidden");
+function duplicateSlot(){
+  const id = `slot_${Date.now()}`;
+  const copy = normalizeDef({ ...structuredClone(def), name: def.name + " (Copy)" });
+  slots.push({ id, def: copy });
+  saveSlots();
+  renderSlotSelects();
+}
+function deleteSlot(){
+  if (slots.length <= 1) return alert("Mindestens 1 Slot muss bleiben.");
+  if (!confirm("Diesen Slot wirklich löschen?")) return;
+
+  const idx = slots.findIndex(s => s.id === currentSlotId);
+  if (idx < 0) return;
+
+  const removed = slots.splice(idx, 1)[0];
+  delete stateMap[removed.id];
+  saveStateMap();
+  saveSlots();
+
+  currentSlotId = slots[0].id;
+  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
+  def = getCurrentDef();
+  state = getCurrentState();
+  weightedBag = buildWeightedBag();
+
+  applyAccent();
+  renderSlotSelects();
+  renderReels();
+  syncHUD();
   renderBuilder();
 }
 
-/* ---------- Events ---------- */
-tabPlay.onclick = showPlay;
-tabBuilder.onclick = showBuilder;
+/* =========================
+   Events
+========================= */
+slotSelect.onchange = () => switchSlot(slotSelect.value);
+bSlotSelect.onchange = () => {
+  if (!isAdmin) return;
+  switchSlot(bSlotSelect.value);
+  renderBuilder();
+};
+
+function switchSlot(id){
+  if (!slots.some(s => s.id === id)) return;
+  currentSlotId = id;
+  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
+
+  def = getCurrentDef();
+  state = getCurrentState();
+  weightedBag = buildWeightedBag();
+
+  applyAccent();
+  renderSlotSelects();
+  renderReels();
+
+  // initial fill
+  for (let r=0;r<5;r++){
+    if (def.reelMode === "stacked") {
+      const sym = randomSymbolFromBag();
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+    } else {
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+    }
+  }
+
+  // stop auto + feature when switching
+  state.auto = false;
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+  saveCurrentState();
+  if (ttc.active) ttcClose();
+
+  syncHUD();
+  setMsg(`Slot gewechselt: ${def.name}`);
+}
 
 spinBtn.onclick = () => spinOnce();
 
 autoBtn.onclick = () => {
+  if (ttc.active) return;
   state.auto = !state.auto;
-  saveState(state);
+  saveCurrentState();
   syncHUD();
   if (!state.auto && autoTimer) {
     clearTimeout(autoTimer);
@@ -646,12 +1182,12 @@ simBtn.onclick = () => simulate(10000);
 
 betDown.onclick = () => {
   state.betPerLine = Math.max(1, (state.betPerLine|0) - 1);
-  saveState(state);
+  saveCurrentState();
   syncHUD();
 };
 betUp.onclick = () => {
   state.betPerLine = Math.min(100, (state.betPerLine|0) + 1);
-  saveState(state);
+  saveCurrentState();
   syncHUD();
 };
 
@@ -659,7 +1195,6 @@ soundToggle.onclick = async () => {
   audioOn = !audioOn;
   if (audioOn) {
     ensureAudio();
-    // some browsers start suspended until resume after gesture:
     if (AC && AC.state === "suspended") await AC.resume();
     beep(440, 80, "triangle", 0.06);
   }
@@ -668,12 +1203,13 @@ soundToggle.onclick = async () => {
 
 resetCredits.onclick = () => {
   state.credits = def.startCredits;
-  saveState(state);
+  saveCurrentState();
   syncHUD();
   setMsg("Credits zurückgesetzt.");
 };
 
 addSymbolBtn.onclick = () => {
+  if (!isAdmin) return;
   def.symbols.push({
     id: `sym_${Date.now()}`,
     icon: "🟣",
@@ -691,11 +1227,13 @@ exportBtn.onclick = () => {
 };
 
 importBtn.onclick = () => {
+  if (!isAdmin) return;
   try {
     const parsed = JSON.parse(jsonBox.value);
     def = normalizeDef(parsed);
+    setCurrentDef(def);
     renderBuilder();
-    alert("Import OK. Jetzt noch 'Speichern & Anwenden' drücken.");
+    alert("Import OK. Jetzt 'Speichern & Anwenden' drücken.");
   } catch (e) {
     alert("JSON ungültig: " + e.message);
   }
@@ -706,24 +1244,33 @@ saveBtn.onclick = () => {
   showPlay();
 };
 
-/* ---------- Utils ---------- */
-function wait(ms){ return new Promise(res => setTimeout(res, ms)); }
+newSlotBtn.onclick = () => { if (isAdmin) createNewSlot(); };
+dupSlotBtn.onclick = () => { if (isAdmin) duplicateSlot(); };
+delSlotBtn.onclick = () => { if (isAdmin) deleteSlot(); };
 
-/* ---------- Boot ---------- */
+/* =========================
+   Boot
+========================= */
 function boot() {
   def = normalizeDef(def);
   weightedBag = buildWeightedBag();
   applyAccent();
 
-  // initial state fix
-  if (!state || typeof state.credits !== "number") {
-    state = { credits: def.startCredits, betPerLine: 1, auto:false };
-  }
-  saveState(state);
-
+  renderSlotSelects();
+  applyAdminUI();
   renderReels();
-  for (let r=0;r<5;r++) for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+
+  // initial fill
+  for (let r=0;r<5;r++){
+    if (def.reelMode === "stacked") {
+      const sym = randomSymbolFromBag();
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], sym);
+    } else {
+      for (let row=0;row<3;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+    }
+  }
+
   syncHUD();
-  setMsg("Bereit. (Builder → eigenen Slot bauen)");
+  setMsg("Bereit. (Ctrl+Alt+# → Admin Unlock)");
 }
 boot();
