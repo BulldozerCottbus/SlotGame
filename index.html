@@ -1,1 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+  <title>Slot Studio (Custom Slots)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
 
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">🎰</div>
+      <div>
+        <div class="title">Slot Studio</div>
+        <div class="subtitle">Baue deinen eigenen Slot & spiele ihn direkt (mit Sounds)</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabPlay">Play</button>
+      <button class="tab" id="tabBuilder">Builder</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ===================== PLAY ===================== -->
+    <section id="viewPlay" class="view">
+      <div class="panel">
+        <div class="panelHead">
+          <div class="slotName" id="slotName">—</div>
+          <div class="tiny">Demo/Arcade (kein Echtgeld)</div>
+        </div>
+
+        <div class="hud">
+          <div class="hudBox">
+            <div class="hudLabel">Credits</div>
+            <div class="hudValue" id="credits">0</div>
+          </div>
+          <div class="hudBox">
+            <div class="hudLabel">Bet / Linie</div>
+            <div class="hudValue row">
+              <button class="mini" id="betDown">–</button>
+              <div id="betPerLine">1</div>
+              <button class="mini" id="betUp">+</button>
+            </div>
+          </div>
+          <div class="hudBox">
+            <div class="hudLabel">Linien</div>
+            <div class="hudValue" id="lineCount">0</div>
+          </div>
+          <div class="hudBox">
+            <div class="hudLabel">Sounds</div>
+            <div class="hudValue row">
+              <button class="mini" id="soundToggle">ON</button>
+              <button class="mini ghost" id="resetCredits">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="reels" id="reels"></div>
+
+        <div class="controls">
+          <button class="btn primary" id="spinBtn">SPIN</button>
+          <button class="btn" id="autoBtn">AUTO: OFF</button>
+          <button class="btn" id="simBtn">RTP Test (10k)</button>
+        </div>
+
+        <div class="msg" id="msg">Bereit.</div>
+        <div class="wins" id="wins"></div>
+      </div>
+    </section>
+
+    <!-- ===================== BUILDER ===================== -->
+    <section id="viewBuilder" class="view hidden">
+      <div class="panel">
+        <div class="panelHead">
+          <div class="slotName">Builder</div>
+          <div class="tiny">Definiere Symbole, Gewichte, Auszahlungen & Linien. Speichern → direkt im Play nutzbar.</div>
+        </div>
+
+        <div class="builderGrid">
+
+          <div class="card">
+            <div class="cardTitle">Slot Einstellungen</div>
+            <label class="field">
+              <span>Name</span>
+              <input id="bName" type="text" placeholder="Mein Slot" />
+            </label>
+            <label class="field">
+              <span>Start-Credits</span>
+              <input id="bStartCredits" type="number" min="0" step="1" />
+            </label>
+            <label class="field">
+              <span>Akzentfarbe (Hex)</span>
+              <input id="bAccent" type="text" placeholder="#00e5ff" />
+            </label>
+            <div class="hint">
+              Tipp: Akzentfarbe steuert den “Arcade”-Glow.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="cardTitle">Linien (Paylines)</div>
+            <div class="lines" id="bLines"></div>
+            <div class="hint">Je mehr Linien, desto “Merkuriger”. Gewinne zählen pro Linie (links → rechts).</div>
+          </div>
+
+          <div class="card wide">
+            <div class="cardTitle row space">
+              <span>Symbole & Auszahlungen</span>
+              <button class="mini" id="addSymbol">+ Symbol</button>
+            </div>
+
+            <div class="tableWrap">
+              <table class="table" id="symbolTable">
+                <thead>
+                  <tr>
+                    <th>Icon (Emoji oder URL)</th>
+                    <th>Name</th>
+                    <th>Gewicht</th>
+                    <th>Payout 3</th>
+                    <th>Payout 4</th>
+                    <th>Payout 5</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="symbolTbody"></tbody>
+              </table>
+            </div>
+
+            <div class="hint">
+              Gewicht = wie häufig das Symbol kommt (höher = häufiger). Payouts sind “x Bet/Linie”.
+              Beispiel: 3x Kirsche = 5 → Gewinn = 5 * Bet/Linie.
+            </div>
+          </div>
+
+          <div class="card wide">
+            <div class="cardTitle">Export / Import (JSON)</div>
+            <textarea id="jsonBox" class="json" spellcheck="false"></textarea>
+            <div class="row gap">
+              <button class="btn" id="exportBtn">Export JSON</button>
+              <button class="btn" id="importBtn">Import JSON</button>
+              <button class="btn primary" id="saveBtn">Speichern & Anwenden</button>
+            </div>
+            <div class="hint">
+              Damit kannst du dir beliebig viele Slots speichern/teilen.
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="slot.js"></script>
+</body>
+</html>
