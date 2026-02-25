@@ -1,1302 +1,1196 @@
-/* Slot Studio v2.1
-   - Admin gate: Ctrl+Alt+# + Code => Builder + RTP sichtbar
-   - Multi-Slots: mehrere Slot-Definitionen + Slot-Wechsel
-   - Variable Reels: 3 oder 5 Walzen (dynamische UI)
-   - Triple-Triple Chance Feature: Trigger bei Vollbild (bei 3x3 = 9 gleiche)
-*/
+/* =========================================================
+  Multi Slot System (Lucky Pharaoh Default)
+  - 5 reels x 3 rows
+  - 10 fixed paylines
+  - Mystery symbol "LP" -> transforms to random symbol
+  - Optional Wild mode: LP can act as Wild + expand reel
+  - Power-Spins when win >= 4x bet (buy with win)
+  - 4 boards simultaneously during Power-Spins
+  - Daily Wheel every 24h (10..100€)
+  - Admin: Ctrl+Alt+# (German: AltGr) + password 1403
+  - Builder: add/clone/import/export slots (custom slots stored in localStorage)
+========================================================= */
 
-const $ = (id) => document.getElementById(id);
+(() => {
+  "use strict";
 
-/* =========================
-   ADMIN (Client-side Gate)
-========================= */
-// ✅ ÄNDERE HIER deinen Admin-Code:
-const ADMIN_CODE = "1234"; // <-- mach hier deinen Code rein
+  /* -------------------------
+     Storage / State
+  ------------------------- */
+  const STORAGE_KEY = "multiSlotSystem.v1";
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
-const LS_ADMIN = "slotStudio.admin.v1";
-let isAdmin = JSON.parse(localStorage.getItem(LS_ADMIN) || "false");
+  const defaultState = {
+    balance: 20.00,
+    bet: 0.10,
+    selectedSlotId: "lucky_pharaoh",
+    lastWheelAt: 0,
+    customSlots: {}, // id -> config
+  };
 
-/* ---------- RNG ---------- */
-function randInt(maxExclusive) {
-  const a = new Uint32Array(1);
-  crypto.getRandomValues(a);
-  return a[0] % maxExclusive;
-}
-function escapeHtml(str){
-  return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
-}
-function looksLikeUrl(x) {
-  return typeof x === "string" && (x.startsWith("http://") || x.startsWith("https://") || x.startsWith("data:"));
-}
-
-/* =========================
-   DEFAULT SLOTS
-========================= */
-const DEFAULT_DEF = {
-  name: "Arcade Deluxe",
-  startCredits: 200,
-  accent: "#00e5ff",
-  rows: 3,
-  reels: 5,                 // ✅ 5 Walzen Default
-  reelMode: "independent",  // independent | stacked
-  features: {
-    ttChanceEnabled: false,
-    ttGreens: 5,
-    ttReds: 1,
-    ttMaxRounds: 10
-  },
-  symbols: [
-    { id:"cherry", icon:"🍒", name:"Cherry",  weight:18, pay:{3:5, 4:20, 5:120} },
-    { id:"lemon",  icon:"🍋", name:"Lemon",   weight:18, pay:{3:5, 4:18, 5:100} },
-    { id:"bell",   icon:"🔔", name:"Bell",    weight:14, pay:{3:8, 4:30, 5:160} },
-    { id:"star",   icon:"⭐",  name:"Star",    weight:12, pay:{3:10,4:40, 5:220} },
-    { id:"diamond",icon:"💎",  name:"Diamond", weight:8,  pay:{3:14,4:70, 5:350} },
-    { id:"seven",  icon:"7️⃣", name:"Seven",   weight:4,  pay:{3:25,4:120,5:700} },
-  ],
-  lines: [
-    { id:"mid",  name:"Middle", pattern:[1,1,1,1,1], enabled:true },
-    { id:"top",  name:"Top",    pattern:[0,0,0,0,0], enabled:true },
-    { id:"bot",  name:"Bottom", pattern:[2,2,2,2,2], enabled:true },
-    { id:"v",    name:"V",      pattern:[0,1,2,1,0], enabled:true },
-    { id:"cap",  name:"^",      pattern:[2,1,0,1,2], enabled:true },
-    { id:"zig",  name:"Zigzag", pattern:[1,0,1,2,1], enabled:false },
-    { id:"zag",  name:"Zagzag", pattern:[1,2,1,0,1], enabled:false },
-  ]
-};
-
-/* ✅ Triple-Triple Chance = 3 Walzen, 5 Paylines (wie bei Merkur) */
-const TTC_DEF = {
-  ...structuredClone(DEFAULT_DEF),
-  name: "Triple-Triple Chance",
-  startCredits: 250,
-  accent: "#00ffb3",
-  reels: 3,                 // ✅ NUR 3 Walzen
-  reelMode: "stacked",      // damit Vollbild realistischer wird
-  features: {
-    ttChanceEnabled: true,
-    ttGreens: 3,            // ✅ „mehrere grüne“ – typisch 3 grün
-    ttReds: 1,              // ✅ 1 rot
-    ttMaxRounds: 0          // ✅ 0 = unlimited
-  },
-  // 3 Walzen – klassische Früchte
-  symbols: [
-    { id:"plum",   icon:"🫐", name:"Pflaume", weight:20, pay:{3:8,  4:0,   5:0} },
-    { id:"cherry", icon:"🍒", name:"Kirsche", weight:22, pay:{3:6,  4:0,   5:0} },
-    { id:"lemon",  icon:"🍋", name:"Zitrone", weight:24, pay:{3:5,  4:0,   5:0} },
-    { id:"bell",   icon:"🔔", name:"Glocke",  weight:16, pay:{3:10, 4:0,   5:0} },
-    { id:"diamond",icon:"💚", name:"Diamant", weight:10, pay:{3:14, 4:0,   5:0} },
-    { id:"seven",  icon:"7️⃣", name:"7",      weight:8,  pay:{3:25, 4:0,   5:0} },
-  ],
-  // 5 Paylines auf 3 Walzen (Top, Mid, Bottom, Diag, Diag)
-  lines: [
-    { id:"mid",  name:"Middle", pattern:[1,1,1], enabled:true },
-    { id:"top",  name:"Top",    pattern:[0,0,0], enabled:true },
-    { id:"bot",  name:"Bottom", pattern:[2,2,2], enabled:true },
-    { id:"d1",   name:"Diag ↘", pattern:[0,1,2], enabled:true },
-    { id:"d2",   name:"Diag ↗", pattern:[2,1,0], enabled:true },
-  ]
-};
-
-/* =========================
-   STORAGE (Multi Slots)
-========================= */
-const LS_SLOTS_KEY = "slotStudio.slots.v2";
-const LS_CURRENT_SLOT = "slotStudio.currentSlotId.v2";
-const LS_STATE_MAP = "slotStudio.stateMap.v2";
-
-function clampInt(v, min, max){
-  v = Number(v);
-  if (Number.isNaN(v)) v = min;
-  v = v|0;
-  return Math.max(min, Math.min(max, v));
-}
-function clampRow(n) {
-  n = Number(n);
-  if (Number.isNaN(n)) return 1;
-  return Math.min(2, Math.max(0, n|0));
-}
-
-/* ✅ Pattern-Länge dynamisch (3 oder 5) */
-function normalizePattern(pat, reels){
-  const out = [];
-  const src = Array.isArray(pat) ? pat : [];
-  for (let i=0;i<reels;i++){
-    const v = (i < src.length) ? src[i] : 1;
-    out.push(clampRow(v));
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...defaultState };
+      const parsed = JSON.parse(raw);
+      return {
+        ...defaultState,
+        ...parsed,
+        customSlots: parsed.customSlots && typeof parsed.customSlots === "object" ? parsed.customSlots : {},
+      };
+    } catch {
+      return { ...defaultState };
+    }
   }
-  return out;
-}
 
-function normalizeDef(def) {
-  const base = structuredClone(DEFAULT_DEF);
-  const out = structuredClone(base);
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
 
-  if (def && typeof def === "object") {
-    out.name = String(def.name ?? out.name);
-    out.startCredits = Math.max(0, Number(def.startCredits ?? out.startCredits) | 0);
-    out.accent = String(def.accent ?? out.accent);
-    out.rows = 3;
+  let state = loadState();
 
-    // ✅ reels erlauben: 3 oder 5
-    const r = Number(def.reels);
-    out.reels = (r === 3 || r === 5) ? r : base.reels;
+  /* -------------------------
+     Crypto RNG helpers
+  ------------------------- */
+  function rand01() {
+    // [0,1)
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] / 2 ** 32;
+  }
 
-    out.reelMode = (def.reelMode === "stacked") ? "stacked" : "independent";
+  function randInt(minIncl, maxIncl) {
+    const r = rand01();
+    return minIncl + Math.floor(r * (maxIncl - minIncl + 1));
+  }
 
-    out.features = {
-      ttChanceEnabled: !!def.features?.ttChanceEnabled,
-      ttGreens: clampInt(def.features?.ttGreens ?? 3, 1, 20),
-      ttReds: clampInt(def.features?.ttReds ?? 1, 1, 20),
-      ttMaxRounds: clampInt(def.features?.ttMaxRounds ?? 0, 0, 99)
-    };
+  function weightedChoice(weightMap) {
+    // weightMap: {key: weight}
+    const entries = Object.entries(weightMap).filter(([, w]) => Number(w) > 0);
+    let total = 0;
+    for (const [, w] of entries) total += Number(w);
 
-    if (Array.isArray(def.symbols) && def.symbols.length >= 3) {
-      out.symbols = def.symbols.map((s, i) => ({
-        id: String(s.id ?? `s${i}`),
-        icon: String(s.icon ?? "❓"),
-        name: String(s.name ?? "Symbol"),
-        weight: Math.max(1, Number(s.weight ?? 10) | 0),
-        pay: {
-          3: Math.max(0, Number(s.pay?.[3] ?? 0) | 0),
-          4: Math.max(0, Number(s.pay?.[4] ?? 0) | 0),
-          5: Math.max(0, Number(s.pay?.[5] ?? 0) | 0),
+    if (total <= 0) return entries.length ? entries[0][0] : null;
+
+    let pick = rand01() * total;
+    for (const [k, w] of entries) {
+      pick -= Number(w);
+      if (pick <= 0) return k;
+    }
+    return entries[entries.length - 1][0];
+  }
+
+  /* -------------------------
+     Default Slot Config
+  ------------------------- */
+  // Symbol keys
+  const SYM = {
+    LP: "LP",       // Lucky Pharaoh logo (Mystery / optional Wild)
+    DIA: "DIA",
+    RUB: "RUB",
+    SAP: "SAP",
+    EME: "EME",
+    A: "A",
+    K: "K",
+    Q: "Q",
+    J: "J",
+    T10: "10",
+  };
+
+  function makeLuckyPharaohSlot() {
+    return {
+      id: "lucky_pharaoh",
+      name: "Lucky Pharaoh",
+      reels: 5,
+      rows: 3,
+      paylines: 10,
+      // Features
+      features: {
+        powerSpins: true,
+        powerTriggerMultiplier: 4, // win >= 4x bet
+        mysterySymbol: SYM.LP,
+        wildMode: true, // LP can act as wild + may expand reel
+        wildExpandChance: 0.20, // 20% expand reel if LP shows
+      },
+      // Symbol definitions (for rendering)
+      symbols: [
+        { key: SYM.LP, label: "LP", type: "lp" },
+        { key: SYM.DIA, label: "💎", type: "gem" },
+        { key: SYM.RUB, label: "🔴", type: "gem" },
+        { key: SYM.SAP, label: "🔵", type: "gem" },
+        { key: SYM.EME, label: "🟢", type: "gem" },
+        { key: SYM.A, label: "A", type: "card" },
+        { key: SYM.K, label: "K", type: "card" },
+        { key: SYM.Q, label: "Q", type: "card" },
+        { key: SYM.J, label: "J", type: "card" },
+        { key: SYM.T10, label: "10", type: "card" },
+      ],
+      // Weights (base game)
+      weights: {
+        base: {
+          [SYM.LP]: 6,
+          [SYM.DIA]: 5,
+          [SYM.RUB]: 8,
+          [SYM.SAP]: 9,
+          [SYM.EME]: 10,
+          [SYM.A]: 14,
+          [SYM.K]: 14,
+          [SYM.Q]: 14,
+          [SYM.J]: 14,
+          [SYM.T10]: 16,
+        },
+        // Increased special chance in Power-Spins
+        power: {
+          [SYM.LP]: 12,
+          [SYM.DIA]: 6,
+          [SYM.RUB]: 9,
+          [SYM.SAP]: 10,
+          [SYM.EME]: 11,
+          [SYM.A]: 12,
+          [SYM.K]: 12,
+          [SYM.Q]: 12,
+          [SYM.J]: 12,
+          [SYM.T10]: 14,
         }
-      }));
-    }
-
-    if (Array.isArray(def.lines) && def.lines.length >= 1) {
-      out.lines = def.lines.map((l, i) => ({
-        id: String(l.id ?? `l${i}`),
-        name: String(l.name ?? `Line ${i+1}`),
-        pattern: normalizePattern(l.pattern, out.reels),
-        enabled: !!l.enabled
-      }));
-    }
-  }
-
-  // safety: mindestens 1 line
-  if (!Array.isArray(out.lines) || out.lines.length === 0) {
-    out.lines = [{ id:"mid", name:"Middle", pattern: normalizePattern([1,1,1,1,1], out.reels), enabled:true }];
-  }
-
-  return out;
-}
-
-function loadSlots() {
-  try {
-    const raw = localStorage.getItem(LS_SLOTS_KEY);
-    if (!raw) {
-      const init = [
-        { id: "slot_arcade", def: normalizeDef(DEFAULT_DEF) },
-        { id: "slot_ttc", def: normalizeDef(TTC_DEF) }
-      ];
-      localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(init));
-      return init;
-    }
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr) || arr.length === 0) throw new Error("bad slots");
-    return arr.map(s => ({ id: String(s.id), def: normalizeDef(s.def) }));
-  } catch {
-    const init = [
-      { id: "slot_arcade", def: normalizeDef(DEFAULT_DEF) },
-      { id: "slot_ttc", def: normalizeDef(TTC_DEF) }
-    ];
-    localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(init));
-    return init;
-  }
-}
-function saveSlots() {
-  localStorage.setItem(LS_SLOTS_KEY, JSON.stringify(slots, null, 2));
-}
-
-function loadStateMap() {
-  try {
-    const raw = localStorage.getItem(LS_STATE_MAP);
-    if (!raw) return {};
-    const obj = JSON.parse(raw);
-    return (obj && typeof obj === "object") ? obj : {};
-  } catch { return {}; }
-}
-function saveStateMap() {
-  localStorage.setItem(LS_STATE_MAP, JSON.stringify(stateMap));
-}
-
-/* =========================
-   DOM refs
-========================= */
-const tabPlay = $("tabPlay");
-const tabBuilder = $("tabBuilder");
-const viewPlay = $("viewPlay");
-const viewBuilder = $("viewBuilder");
-
-const slotNameEl = $("slotName");
-const slotSelect = $("slotSelect");
-const adminPill = $("adminPill");
-
-const creditsEl = $("credits");
-const betPerLineEl = $("betPerLine");
-const lineCountEl = $("lineCount");
-const reelsEl = $("reels");
-const msgEl = $("msg");
-const winsEl = $("wins");
-
-const spinBtn = $("spinBtn");
-const autoBtn = $("autoBtn");
-const simBtn = $("simBtn");
-const betDown = $("betDown");
-const betUp = $("betUp");
-const soundToggle = $("soundToggle");
-const resetCredits = $("resetCredits");
-
-/* Builder */
-const bSlotSelect = $("bSlotSelect");
-const newSlotBtn = $("newSlotBtn");
-const dupSlotBtn = $("dupSlotBtn");
-const delSlotBtn = $("delSlotBtn");
-
-const bName = $("bName");
-const bStartCredits = $("bStartCredits");
-const bAccent = $("bAccent");
-const bReelMode = $("bReelMode");
-
-const bTTEnabled = $("bTTEnabled");
-const bTTGreens = $("bTTGreens");
-const bTTReds = $("bTTReds");
-const bTTMaxRounds = $("bTTMaxRounds");
-
-const bLines = $("bLines");
-const symbolTbody = $("symbolTbody");
-const addSymbolBtn = $("addSymbol");
-const exportBtn = $("exportBtn");
-const importBtn = $("importBtn");
-const saveBtn = $("saveBtn");
-const jsonBox = $("jsonBox");
-
-/* Admin modal */
-const adminModal = $("adminModal");
-const adminCode = $("adminCode");
-const adminUnlockBtn = $("adminUnlockBtn");
-const adminLogoutBtn = $("adminLogoutBtn");
-const adminCloseBtn = $("adminCloseBtn");
-const adminStatus = $("adminStatus");
-
-/* TTC modal */
-const ttcModal = $("ttcModal");
-const ttcBaseEl = $("ttcBase");
-const ttcPendingEl = $("ttcPending");
-const ttcGreensEl = $("ttcGreens");
-const ttcRoundEl = $("ttcRound");
-const ttcBoard = $("ttcBoard");
-const ttcLamps = $("ttcLamps");
-const ttcSpinBtn = $("ttcSpinBtn");
-const ttcCollectBtn = $("ttcCollectBtn");
-const ttcMsg = $("ttcMsg");
-
-/* =========================
-   Sounds (WebAudio)
-========================= */
-let audioOn = true;
-let AC = null;
-
-function ensureAudio() {
-  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
-}
-function beep(freq, durMs, type="sine", gain=0.06) {
-  if (!audioOn) return;
-  ensureAudio();
-  const t0 = AC.currentTime;
-  const osc = AC.createOscillator();
-  const g = AC.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
-  g.gain.exponentialRampToToValueAtTime?.(0.0001, t0 + durMs/1000); // harmless if unsupported
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + durMs/1000);
-  osc.connect(g).connect(AC.destination);
-  osc.start(t0);
-  osc.stop(t0 + durMs/1000 + 0.02);
-}
-function winJingle() {
-  if (!audioOn) return;
-  beep(659, 120, "triangle", 0.07);
-  setTimeout(()=>beep(784, 120, "triangle", 0.07), 120);
-  setTimeout(()=>beep(988, 160, "triangle", 0.08), 240);
-}
-function spinTick() { beep(160, 35, "square", 0.03); }
-function stopTick() { beep(220, 70, "sawtooth", 0.04); }
-function greenSound(){ beep(880, 90, "triangle", 0.08); }
-function redSound(){ beep(140, 160, "sawtooth", 0.09); }
-
-/* =========================
-   Runtime State
-========================= */
-let slots = loadSlots();
-let currentSlotId = localStorage.getItem(LS_CURRENT_SLOT) || slots[0].id;
-
-let stateMap = loadStateMap();
-let def = getCurrentDef();
-let state = getCurrentState();
-
-let weightedBag = buildWeightedBag();
-
-let cellMatrix = []; // [row][reel] => element
-let spinning = false;
-let autoTimer = null;
-
-/* TTC Feature state */
-let ttc = {
-  active: false,
-  basePayout: 0,
-  pending: 0,
-  greens: 0,
-  round: 0,
-  maxRounds: 0,
-  greensPerRound: 3,
-  redsPerRound: 1
-};
-
-/* =========================
-   Helpers
-========================= */
-function getCurrentDef(){
-  const slot = slots.find(s => s.id === currentSlotId) || slots[0];
-  currentSlotId = slot.id;
-  return slot.def;
-}
-function setCurrentDef(newDef){
-  const idx = slots.findIndex(s => s.id === currentSlotId);
-  if (idx >= 0) {
-    slots[idx].def = normalizeDef(newDef);
-    def = slots[idx].def;
-    saveSlots();
-  }
-}
-function getCurrentState(){
-  const st = stateMap[currentSlotId];
-  if (st && typeof st.credits === "number") return st;
-
-  const init = { credits: def.startCredits, betPerLine: 1, auto: false };
-  stateMap[currentSlotId] = init;
-  saveStateMap();
-  return init;
-}
-function saveCurrentState(){
-  stateMap[currentSlotId] = state;
-  saveStateMap();
-}
-
-function setMsg(t){ msgEl.textContent = t; }
-
-function applyAccent() {
-  document.documentElement.style.setProperty("--accent", def.accent || "#00e5ff");
-}
-function enabledLines() {
-  return def.lines.filter(l => l.enabled);
-}
-function getSymbolById(id) {
-  return def.symbols.find(s => s.id === id) || def.symbols[0];
-}
-function renderCell(cell, symId) {
-  const s = getSymbolById(symId);
-  const iconEl = cell.querySelector(".icon");
-  const labelEl = cell.querySelector(".label");
-
-  if (looksLikeUrl(s.icon)) {
-    iconEl.textContent = "";
-    iconEl.style.fontSize = "0px";
-    iconEl.innerHTML = `<img alt="" src="${escapeHtml(s.icon)}" style="width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));" />`;
-  } else {
-    iconEl.style.fontSize = "";
-    iconEl.textContent = s.icon || "❓";
-  }
-  labelEl.textContent = s.name || "";
-}
-
-function buildWeightedBag() {
-  const bag = [];
-  for (const s of def.symbols) {
-    const w = Math.max(1, s.weight|0);
-    for (let i=0;i<w;i++) bag.push(s.id);
-  }
-  return bag.length ? bag : def.symbols.map(s=>s.id);
-}
-function randomSymbolFromBag() {
-  return weightedBag[randInt(weightedBag.length)];
-}
-function wait(ms){ return new Promise(res => setTimeout(res, ms)); }
-
-/* =========================
-   UI: Slot select + Admin UI
-========================= */
-function renderSlotSelects(){
-  slotSelect.innerHTML = "";
-  bSlotSelect.innerHTML = "";
-
-  for (const s of slots) {
-    const opt1 = document.createElement("option");
-    opt1.value = s.id;
-    opt1.textContent = s.def.name;
-    if (s.id === currentSlotId) opt1.selected = true;
-    slotSelect.appendChild(opt1);
-
-    const opt2 = document.createElement("option");
-    opt2.value = s.id;
-    opt2.textContent = s.def.name;
-    if (s.id === currentSlotId) opt2.selected = true;
-    bSlotSelect.appendChild(opt2);
-  }
-}
-function applyAdminUI(){
-  tabBuilder.classList.toggle("hidden", !isAdmin);
-  simBtn.classList.toggle("hidden", !isAdmin);
-  adminPill.classList.toggle("hidden", !isAdmin);
-
-  if (!isAdmin && !viewBuilder.classList.contains("hidden")) showPlay();
-}
-
-function openAdminModal(){
-  adminModal.classList.remove("hidden");
-  adminCode.value = "";
-  adminStatus.textContent = isAdmin ? "Status: Admin ist aktiv." : "Status: Admin ist NICHT aktiv.";
-  adminCode.focus();
-}
-function closeAdminModal(){
-  adminModal.classList.add("hidden");
-}
-
-/* Ctrl+Alt+# (oder Ctrl+Alt+3) */
-document.addEventListener("keydown", (e) => {
-  if (!(e.ctrlKey && e.altKey)) return;
-
-  const keyIsHash =
-    e.key === "#" ||
-    (e.code === "Digit3") ||
-    (e.key === "3");
-
-  if (keyIsHash) {
-    e.preventDefault();
-    openAdminModal();
-  }
-});
-
-adminUnlockBtn.onclick = () => {
-  if (adminCode.value === ADMIN_CODE) {
-    isAdmin = true;
-    localStorage.setItem(LS_ADMIN, "true");
-    adminStatus.textContent = "✅ Admin freigeschaltet.";
-    applyAdminUI();
-    beep(700, 120, "triangle", 0.08);
-  } else {
-    adminStatus.textContent = "❌ Falscher Code.";
-    beep(200, 160, "sawtooth", 0.06);
-  }
-};
-adminLogoutBtn.onclick = () => {
-  isAdmin = false;
-  localStorage.setItem(LS_ADMIN, "false");
-  adminStatus.textContent = "Logout: Admin deaktiviert.";
-  applyAdminUI();
-};
-adminCloseBtn.onclick = closeAdminModal;
-adminModal.addEventListener("click", (e) => {
-  if (e.target === adminModal) closeAdminModal();
-});
-
-/* =========================
-   Tabs
-========================= */
-function showPlay() {
-  tabPlay.classList.add("active");
-  tabBuilder.classList.remove("active");
-  viewPlay.classList.remove("hidden");
-  viewBuilder.classList.add("hidden");
-}
-function showBuilder() {
-  if (!isAdmin) return;
-  tabBuilder.classList.add("active");
-  tabPlay.classList.remove("active");
-  viewBuilder.classList.remove("hidden");
-  viewPlay.classList.add("hidden");
-  renderBuilder();
-}
-tabPlay.onclick = showPlay;
-tabBuilder.onclick = showBuilder;
-
-/* =========================
-   Render reels (DYNAMISCH)
-========================= */
-function renderReels() {
-  reelsEl.innerHTML = "";
-  reelsEl.style.gridTemplateColumns = `repeat(${def.reels}, minmax(0,1fr))`; // ✅ 3 oder 5
-
-  cellMatrix = Array.from({length:def.rows}, ()=>Array(def.reels).fill(null));
-
-  for (let r = 0; r < def.reels; r++) {
-    const col = document.createElement("div");
-    col.className = "reel";
-
-    for (let row = 0; row < def.rows; row++) {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-
-      const icon = document.createElement("div");
-      icon.className = "icon";
-      icon.textContent = "❓";
-
-      const label = document.createElement("div");
-      label.className = "label";
-      label.textContent = "";
-
-      cell.appendChild(icon);
-      cell.appendChild(label);
-      col.appendChild(cell);
-      cellMatrix[row][r] = cell;
-    }
-    reelsEl.appendChild(col);
-  }
-}
-
-function syncHUD() {
-  slotNameEl.textContent = def.name;
-  creditsEl.textContent = String(state.credits);
-  betPerLineEl.textContent = String(state.betPerLine);
-  lineCountEl.textContent = String(enabledLines().length);
-  autoBtn.textContent = `AUTO: ${state.auto ? "ON" : "OFF"}`;
-  soundToggle.textContent = audioOn ? "ON" : "OFF";
-}
-
-function clearHighlights() {
-  for (let row=0; row<def.rows; row++) {
-    for (let r=0; r<def.reels; r++) {
-      cellMatrix[row][r].classList.remove("win","dim");
-    }
-  }
-}
-function dimAllExcept(coordsSet) {
-  for (let row=0; row<def.rows; row++) {
-    for (let r=0; r<def.reels; r++) {
-      const key = `${row},${r}`;
-      if (!coordsSet.has(key)) cellMatrix[row][r].classList.add("dim");
-    }
-  }
-}
-
-/* =========================
-   Spin animation
-========================= */
-function startSpinAnimation() {
-  clearHighlights();
-  winsEl.innerHTML = "";
-  setMsg("Spinning...");
-  spinBtn.disabled = true;
-  simBtn.disabled = true;
-  betDown.disabled = true;
-  betUp.disabled = true;
-
-  spinTick();
-
-  const intervals = [];
-  for (let r=0; r<def.reels; r++) {
-    const iv = setInterval(() => {
-      if (def.reelMode === "stacked") {
-        const sym = randomSymbolFromBag();
-        for (let row=0; row<def.rows; row++) renderCell(cellMatrix[row][r], sym);
-      } else {
-        for (let row=0; row<def.rows; row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+      },
+      // Paytable multipliers (per line bet)
+      // payout = lineBet * multiplier
+      paytable: {
+        [SYM.DIA]: { 3: 6, 4: 24, 5: 120 },
+        [SYM.RUB]: { 3: 4, 4: 14, 5: 70 },
+        [SYM.SAP]: { 3: 3, 4: 12, 5: 60 },
+        [SYM.EME]: { 3: 3, 4: 10, 5: 50 },
+        [SYM.A]:   { 3: 1.2, 4: 4,  5: 18 },
+        [SYM.K]:   { 3: 1.0, 4: 3.5,5: 16 },
+        [SYM.Q]:   { 3: 0.9, 4: 3.2,5: 14 },
+        [SYM.J]:   { 3: 0.8, 4: 3.0,5: 12 },
+        [SYM.T10]: { 3: 0.7, 4: 2.8,5: 10 },
       }
-    }, 70);
-    intervals.push(iv);
+    };
   }
-  return intervals;
-}
 
-function stopReel(intervals, reelIndex, finalColSyms) {
-  clearInterval(intervals[reelIndex]);
-  for (let row=0; row<def.rows; row++) {
-    renderCell(cellMatrix[row][reelIndex], finalColSyms[row]);
+  function getAllSlots() {
+    const defaults = {
+      lucky_pharaoh: makeLuckyPharaohSlot(),
+    };
+    // Merge custom (custom can override id collisions intentionally)
+    return { ...defaults, ...(state.customSlots || {}) };
   }
-  stopTick();
-}
 
-/* =========================
-   Outcome generation
-========================= */
-function generateOutcome() {
-  const grid = Array.from({length:def.rows}, ()=>Array(def.reels).fill(null));
+  /* -------------------------
+     Paylines (10 fixed)
+     Each line is an array of row indices per reel (0..2)
+  ------------------------- */
+  const PAYLINES = [
+    [1,1,1,1,1], // middle
+    [0,0,0,0,0], // top
+    [2,2,2,2,2], // bottom
+    [0,1,2,1,0], // V
+    [2,1,0,1,2], // inverted V
+    [0,0,1,0,0],
+    [2,2,1,2,2],
+    [1,0,0,0,1],
+    [1,2,2,2,1],
+    [0,1,1,1,0],
+  ];
 
-  if (def.reelMode === "stacked") {
-    for (let r=0; r<def.reels; r++) {
-      const sym = randomSymbolFromBag();
-      for (let row=0; row<def.rows; row++) grid[row][r] = sym;
+  /* -------------------------
+     DOM
+  ------------------------- */
+  const $ = (id) => document.getElementById(id);
+
+  const balanceEl = $("balance");
+  const slotSelect = $("slotSelect");
+  const betSelect = $("betSelect");
+  const spinBtn = $("spinBtn");
+  const wheelBtn = $("wheelBtn");
+  const wheelCooldownText = $("wheelCooldownText");
+
+  const baseBoardEl = $("baseBoard");
+  const statusText = $("statusText");
+  const lastWinEl = $("lastWin");
+  const logEl = $("log");
+  const slotMetaEl = $("slotMeta");
+
+  const powerPanel = $("powerPanel");
+  const powerMeta = $("powerMeta");
+  const powerStatus = $("powerStatus");
+  const powerWinEl = $("powerWin");
+  const pBoards = [ $("pBoard1"), $("pBoard2"), $("pBoard3"), $("pBoard4") ];
+
+  // Power modal
+  const powerModalOverlay = $("powerModalOverlay");
+  const powerModalText = $("powerModalText");
+  const powerBuyRange = $("powerBuyRange");
+  const powerBuySpins = $("powerBuySpins");
+  const powerBuyCost = $("powerBuyCost");
+  const takeWinBtn = $("takeWinBtn");
+  const buyPowerBtn = $("buyPowerBtn");
+  const closePowerModal = $("closePowerModal");
+
+  // Wheel modal
+  const wheelModalOverlay = $("wheelModalOverlay");
+  const wheel = $("wheel");
+  const wheelInfo = $("wheelInfo");
+  const wheelReadyText = $("wheelReadyText");
+  const spinWheelBtn = $("spinWheelBtn");
+  const closeWheelModal = $("closeWheelModal");
+
+  // Admin / Builder
+  const adminOverlay = $("adminOverlay");
+  const closeAdmin = $("closeAdmin");
+  const adminBalanceInput = $("adminBalanceInput");
+  const adminSetBalanceBtn = $("adminSetBalanceBtn");
+  const adminResetWheelBtn = $("adminResetWheelBtn");
+  const adminExportDataBtn = $("adminExportDataBtn");
+  const adminResetAllBtn = $("adminResetAllBtn");
+
+  const builderNewBtn = $("builderNewBtn");
+  const builderCloneBtn = $("builderCloneBtn");
+  const builderDeleteBtn = $("builderDeleteBtn");
+  const builderSlotSelect = $("builderSlotSelect");
+  const builderJson = $("builderJson");
+  const builderSaveBtn = $("builderSaveBtn");
+  const builderExportSlotBtn = $("builderExportSlotBtn");
+  const builderImportSlotBtn = $("builderImportSlotBtn");
+
+  /* -------------------------
+     UI Helpers
+  ------------------------- */
+  function eur(n) {
+    const x = Number(n || 0);
+    return "€" + x.toFixed(2);
+  }
+
+  function setStatus(msg) {
+    statusText.textContent = msg;
+  }
+
+  function log(msg) {
+    const div = document.createElement("div");
+    div.className = "logItem";
+    div.innerHTML = msg;
+    logEl.prepend(div);
+    // keep reasonable size
+    while (logEl.children.length > 8) logEl.lastElementChild.remove();
+  }
+
+  function getSelectedSlot() {
+    const all = getAllSlots();
+    const s = all[state.selectedSlotId];
+    return s || all["lucky_pharaoh"];
+  }
+
+  function renderTopMeta() {
+    const slot = getSelectedSlot();
+    slotMetaEl.textContent = `${slot.reels}×${slot.rows} · ${slot.paylines} Linien · Mystery: ${slot.features.mysterySymbol}${slot.features.wildMode ? " · Wild" : ""}`;
+  }
+
+  function renderBalance() {
+    balanceEl.textContent = eur(state.balance);
+  }
+
+  function fillBetOptions() {
+    const bets = [0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90,1.00,2.00];
+    betSelect.innerHTML = "";
+    for (const b of bets) {
+      const opt = document.createElement("option");
+      opt.value = String(b);
+      opt.textContent = eur(b);
+      betSelect.appendChild(opt);
+    }
+    betSelect.value = String(state.bet);
+  }
+
+  function fillSlotOptions() {
+    const all = getAllSlots();
+    slotSelect.innerHTML = "";
+    for (const [id, cfg] of Object.entries(all)) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = cfg.name + (id === "lucky_pharaoh" ? " (Default)" : "");
+      slotSelect.appendChild(opt);
+    }
+    if (!all[state.selectedSlotId]) state.selectedSlotId = "lucky_pharaoh";
+    slotSelect.value = state.selectedSlotId;
+
+    // builder select
+    builderSlotSelect.innerHTML = "";
+    for (const [id, cfg] of Object.entries(all)) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = cfg.name + (state.customSlots[id] ? " (Custom)" : " (Built-in)");
+      builderSlotSelect.appendChild(opt);
+    }
+    builderSlotSelect.value = state.selectedSlotId;
+  }
+
+  function updateWheelCooldownUI() {
+    const now = Date.now();
+    const next = (state.lastWheelAt || 0) + DAY_MS;
+    if (now >= next) {
+      wheelCooldownText.textContent = "Wheel: bereit";
+      wheelBtn.classList.add("primary");
+    } else {
+      wheelBtn.classList.remove("primary");
+      const ms = next - now;
+      const h = Math.floor(ms / (60*60*1000));
+      const m = Math.floor((ms % (60*60*1000)) / (60*1000));
+      const s = Math.floor((ms % (60*1000)) / 1000);
+      wheelCooldownText.textContent = `Wheel: in ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
+  }
+
+  /* -------------------------
+     Board Rendering
+  ------------------------- */
+  function symbolDef(slot, key) {
+    return slot.symbols.find(s => s.key === key) || { key, label: key, type: "card" };
+  }
+
+  function clearWinHighlights(boardEl) {
+    boardEl.querySelectorAll(".symbol.win").forEach(el => el.classList.remove("win"));
+  }
+
+  function renderBoard(boardEl, slot, gridKeys) {
+    // gridKeys: rows x reels -> key
+    boardEl.innerHTML = "";
+    for (let r = 0; r < slot.rows; r++) {
+      for (let c = 0; c < slot.reels; c++) {
+        const key = gridKeys[r][c];
+        const def = symbolDef(slot, key);
+
+        const cell = document.createElement("div");
+        cell.className = "symbol";
+        if (def.type === "lp") cell.classList.add("lp");
+        if (def.type === "card") cell.classList.add("card");
+
+        const icon = document.createElement("div");
+        icon.className = "icon";
+        icon.textContent = def.label;
+        cell.appendChild(icon);
+
+        cell.dataset.r = String(r);
+        cell.dataset.c = String(c);
+        cell.dataset.key = key;
+
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function highlightPositions(boardEl, positions) {
+    // positions: [{r,c}, ...]
+    for (const p of positions) {
+      const el = boardEl.querySelector(`.symbol[data-r="${p.r}"][data-c="${p.c}"]`);
+      if (el) el.classList.add("win");
+    }
+  }
+
+  function boardSpinAnim(boardEl, on) {
+    if (on) boardEl.classList.add("spinning");
+    else boardEl.classList.remove("spinning");
+  }
+
+  /* -------------------------
+     Grid Generation
+  ------------------------- */
+  function generateGrid(slot, mode) {
+    const weights = (mode === "power") ? slot.weights.power : slot.weights.base;
+    const grid = Array.from({ length: slot.rows }, () => Array.from({ length: slot.reels }, () => SYM.T10));
+
+    for (let c = 0; c < slot.reels; c++) {
+      for (let r = 0; r < slot.rows; r++) {
+        const k = weightedChoice(weights);
+        grid[r][c] = k;
+      }
     }
     return grid;
   }
 
-  for (let r=0; r<def.reels; r++) {
-    for (let row=0; row<def.rows; row++) {
-      grid[row][r] = randomSymbolFromBag();
-    }
-  }
-  return grid;
-}
+  /* -------------------------
+     Mystery / Wild Transform
+  ------------------------- */
+  const WILD = "__WILD__";
 
-/* Vollbild = rows*reels gleiche Symbole (bei 3x3 = 9) */
-function isFullScreen(grid){
-  const first = grid[0][0];
-  for (let row=0; row<def.rows; row++){
-    for (let r=0; r<def.reels; r++){
-      if (grid[row][r] !== first) return false;
-    }
-  }
-  return true;
-}
+  function applyMysteryAndWild(slot, grid, mode) {
+    // Creates evaluated grid where LP is transformed / wild logic applied.
+    // Also returns "revealMap" to show what LP became (optional).
+    const out = grid.map(row => row.slice());
+    const revealMap = new Map(); // key: "r,c" -> revealedSymbolKey
 
-/* =========================
-   Win evaluation (links->rechts)
-   - bei 3 Walzen gewinnt nur "3 gleiche"
-========================= */
-function evaluate(grid, betPerLine) {
-  const lines = enabledLines();
-  const wins = [];
-  let totalWin = 0;
+    const mystery = slot.features.mysterySymbol;
+    const wildMode = !!slot.features.wildMode;
 
-  for (const line of lines) {
-    const pattern = normalizePattern(line.pattern, def.reels);
-    const first = grid[pattern[0]][0];
+    // Helper: choose a random non-LP symbol
+    const pool = slot.symbols.map(s => s.key).filter(k => k !== mystery);
+    const bestSymbol = SYM.DIA; // for all-wild segments choose diamond (highest)
+    const expandChance = slot.features.wildExpandChance ?? 0;
 
-    let len = 1;
-    for (let r=1; r<def.reels; r++) {
-      const sym = grid[pattern[r]][r];
-      if (sym === first) len++;
-      else break;
-    }
+    for (let r = 0; r < slot.rows; r++) {
+      for (let c = 0; c < slot.reels; c++) {
+        if (out[r][c] === mystery) {
+          if (wildMode) {
+            // LP acts as wild
+            out[r][c] = WILD;
 
-    if (len >= 3) {
-      const symObj = getSymbolById(first);
-      const mult = symObj.pay[len] || 0;
-      const amount = mult * betPerLine;
-      if (amount > 0) {
-        totalWin += amount;
-        wins.push({
-          lineId: line.id,
-          lineName: line.name,
-          symbolId: first,
-          symbolName: symObj.name,
-          icon: symObj.icon,
-          len,
-          mult,
-          amount,
-          coords: pattern.map((row, r)=>({row, r})).slice(0, len)
-        });
+            // Optional expand reel (turn entire column into wild) - mostly in power mode, but we allow always
+            const chanceBoost = (mode === "power") ? 1.15 : 1.0;
+            if (rand01() < (expandChance * chanceBoost)) {
+              for (let rr = 0; rr < slot.rows; rr++) out[rr][c] = WILD;
+            }
+          } else {
+            // Pure mystery: transforms to a random symbol
+            const revealed = pool[randInt(0, pool.length - 1)] || bestSymbol;
+            out[r][c] = revealed;
+            revealMap.set(`${r},${c}`, revealed);
+          }
+        }
       }
     }
+
+    return { evalGrid: out, revealMap };
   }
 
-  return { wins, totalWin };
-}
+  /* -------------------------
+     Win Evaluation (10 lines)
+     "Anywhere on the line" -> we pay the BEST consecutive segment of length >=3,
+     not necessarily from left edge.
+  ------------------------- */
+  function evaluateWins(slot, evalGrid, betTotal) {
+    const linesCount = slot.paylines;
+    const lineBet = betTotal / linesCount;
 
-function renderWins(wins) {
-  winsEl.innerHTML = "";
-  for (const w of wins) {
-    const row = document.createElement("div");
-    row.className = "winRow";
-    const left = document.createElement("div");
-    const icon = looksLikeUrl(w.icon) ? "🟦" : w.icon;
-    left.textContent = `${icon} ${w.symbolName} ×${w.len} (Linie: ${w.lineName})`;
-    const right = document.createElement("div");
-    right.innerHTML = `<b>+${w.amount}</b> <span style="color:var(--muted);font-size:12px;">(x${w.mult})</span>`;
-    row.appendChild(left);
-    row.appendChild(right);
-    winsEl.appendChild(row);
-  }
-}
+    let totalWin = 0;
+    const lineWins = []; // { lineIndex, amount, symbol, length, positions }
 
-function highlightWins(wins) {
-  clearHighlights();
-  if (!wins.length) return;
+    for (let li = 0; li < PAYLINES.length; li++) {
+      const pattern = PAYLINES[li];
+      const seq = [];
+      const pos = [];
+      for (let c = 0; c < slot.reels; c++) {
+        const r = pattern[c];
+        seq.push(evalGrid[r][c]);
+        pos.push({ r, c });
+      }
 
-  const set = new Set();
-  for (const w of wins) for (const c of w.coords) set.add(`${c.row},${c.r}`);
+      // Find best segment of consecutive indices [i..j], len>=3, all match (wild allowed)
+      let best = { amount: 0, symbol: null, length: 0, positions: [] };
 
-  for (const key of set) {
-    const [row, r] = key.split(",").map(Number);
-    cellMatrix[row][r].classList.add("win");
-  }
-  dimAllExcept(set);
-}
+      for (let start = 0; start < slot.reels; start++) {
+        for (let end = start + 2; end < slot.reels; end++) {
+          const len = end - start + 1;
+          // Determine base symbol: first non-wild in segment
+          let base = null;
+          for (let k = start; k <= end; k++) {
+            if (seq[k] !== WILD) { base = seq[k]; break; }
+          }
+          if (!base) base = SYM.DIA; // all wilds -> treat as diamond
 
-/* =========================
-   Triple-Triple Chance Feature
-   - Grün: +Vollbild-Payout
-   - Rot: alles rot, pending = 0, Ende
-========================= */
-function ttcOpen(basePayout){
-  state.auto = false;
-  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
-  saveCurrentState();
-  syncHUD();
+          // Validate
+          let ok = true;
+          for (let k = start; k <= end; k++) {
+            const s = seq[k];
+            if (s !== base && s !== WILD) { ok = false; break; }
+          }
+          if (!ok) continue;
 
-  ttc.active = true;
-  ttc.basePayout = Math.max(0, basePayout|0);
-  ttc.pending = 0;
-  ttc.greens = 0;
-  ttc.round = 0;
+          const pt = slot.paytable[base];
+          if (!pt || !pt[len]) continue;
 
-  ttc.maxRounds = clampInt(def.features?.ttMaxRounds ?? 0, 0, 99);
-  ttc.greensPerRound = clampInt(def.features?.ttGreens ?? 3, 1, 20);
-  ttc.redsPerRound = clampInt(def.features?.ttReds ?? 1, 1, 20);
+          const amount = pt[len] * lineBet;
+          if (amount > best.amount) {
+            best = {
+              amount,
+              symbol: base,
+              length: len,
+              positions: pos.slice(start, end + 1),
+            };
+          }
+        }
+      }
 
-  ttcBaseEl.textContent = String(ttc.basePayout);
-  ttcPendingEl.textContent = "0";
-  ttcGreensEl.textContent = "0";
-  ttcRoundEl.textContent = "0";
-  ttcMsg.textContent = "Start: SPIN-OFF drücken (Rot beendet alles)";
-
-  renderTtcBoard(null);
-  renderTtcLamps("reset");
-
-  ttcModal.classList.remove("hidden");
-}
-
-function ttcClose(){
-  ttc.active = false;
-  ttcModal.classList.add("hidden");
-}
-
-function renderTtcBoard(pickIndex){
-  const totalTiles = ttc.greensPerRound + ttc.redsPerRound;
-  const tiles = [];
-
-  for (let i=0;i<ttc.greensPerRound;i++) tiles.push("green");
-  for (let i=0;i<ttc.redsPerRound;i++) tiles.push("red");
-
-  for (let i = tiles.length - 1; i > 0; i--) {
-    const j = randInt(i + 1);
-    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
-  }
-
-  ttcBoard.innerHTML = "";
-  tiles.forEach((type, idx) => {
-    const d = document.createElement("div");
-    d.className = `ttcTile ${type}` + (pickIndex === idx ? " pick" : "");
-    d.textContent = type === "green" ? "GRÜN" : "ROT";
-    ttcBoard.appendChild(d);
-  });
-
-  return tiles;
-}
-
-function renderTtcLamps(mode){
-  if (mode === "reset") {
-    ttcLamps.innerHTML = "";
-    for (let i=0;i<12;i++){
-      const l = document.createElement("div");
-      l.className = "lamp";
-      ttcLamps.appendChild(l);
+      if (best.amount > 0) {
+        totalWin += best.amount;
+        lineWins.push({ lineIndex: li, ...best });
+      }
     }
-    return;
+
+    // Round to cents (avoid float drift)
+    totalWin = Math.round(totalWin * 100) / 100;
+    for (const lw of lineWins) lw.amount = Math.round(lw.amount * 100) / 100;
+
+    return { totalWin, lineWins };
   }
 
-  const lamps = Array.from(ttcLamps.querySelectorAll(".lamp"));
-  if (mode === "green") {
-    if (ttc.greens - 1 < lamps.length) lamps[ttc.greens - 1].classList.add("green");
+  /* -------------------------
+     Game Flow
+  ------------------------- */
+  let isSpinning = false;
+  let pendingPower = null; // { baseWin, bet, slotId }
+
+  function canSpin(bet) {
+    return Number(state.balance) >= Number(bet) && !isSpinning;
   }
-  if (mode === "red") {
-    for (const l of lamps) {
-      l.classList.remove("green");
-      l.classList.add("red");
+
+  function setControlsEnabled(on) {
+    spinBtn.disabled = !on;
+    wheelBtn.disabled = !on;
+    slotSelect.disabled = !on;
+    betSelect.disabled = !on;
+  }
+
+  async function spinBase() {
+    if (isSpinning) return;
+    const slot = getSelectedSlot();
+    const bet = Number(state.bet);
+
+    if (state.balance < bet) {
+      setStatus("Nicht genug Balance. Dreh am Daily Wheel (24h) oder lass Admin nachladen.");
+      log(`<b>Kein Spin:</b> Balance zu niedrig (${eur(state.balance)}).`);
+      return;
     }
-  }
-}
 
-async function ttcSpin(){
-  if (!ttc.active) return;
-  ensureAudio();
+    isSpinning = true;
+    setControlsEnabled(false);
 
-  if (ttc.maxRounds > 0 && ttc.round >= ttc.maxRounds) {
-    ttcMsg.textContent = "Max Runden erreicht → Auto-COLLECT.";
-    ttcCollect();
-    return;
-  }
+    // Deduct bet
+    state.balance = Math.round((state.balance - bet) * 100) / 100;
+    saveState();
+    renderBalance();
 
-  ttc.round++;
-  ttcRoundEl.textContent = String(ttc.round);
+    setStatus("Dreht...");
+    clearWinHighlights(baseBoardEl);
+    boardSpinAnim(baseBoardEl, true);
 
-  const totalTiles = ttc.greensPerRound + ttc.redsPerRound;
-  const pick = randInt(totalTiles);
+    // Generate + render quickly, then reveal after delay
+    const rawGrid = generateGrid(slot, "base");
+    renderBoard(baseBoardEl, slot, rawGrid);
 
-  const mapping = renderTtcBoard(pick);
-  await wait(80);
+    await wait(750);
 
-  const result = mapping[pick];
-  if (result === "green") {
-    ttc.greens++;
-    ttc.pending += ttc.basePayout;
+    // Evaluate with mystery/wild transformations
+    const { evalGrid } = applyMysteryAndWild(slot, rawGrid, "base");
+    const res = evaluateWins(slot, evalGrid, bet);
 
-    ttcPendingEl.textContent = String(ttc.pending);
-    ttcGreensEl.textContent = String(ttc.greens);
-    renderTtcLamps("green");
+    boardSpinAnim(baseBoardEl, false);
 
-    ttcMsg.textContent = `✅ GRÜN! +${ttc.basePayout} Bonus (weiter drehen oder collect)`;
-    greenSound();
-  } else {
-    // Rot: alles wird rot & Bonus weg
-    ttc.pending = 0;
-    ttc.greens = 0;
+    // Highlight wins on base board (using pattern positions; we highlight raw positions)
+    clearWinHighlights(baseBoardEl);
+    for (const lw of res.lineWins) {
+      highlightPositions(baseBoardEl, lw.positions);
+    }
 
-    ttcPendingEl.textContent = "0";
-    ttcGreensEl.textContent = "0";
-    renderTtcLamps("red");
+    const win = res.totalWin;
+    lastWinEl.textContent = eur(win);
 
-    ttcMsg.textContent = "🟥 ROT! Feature beendet. Alles Grün wurde rot (Bonus weg).";
-    redSound();
+    if (win > 0) {
+      setStatus(`Gewinn: ${eur(win)} (${res.lineWins.length} Linie(n))`);
+      log(`<b>Win:</b> ${eur(win)} · Einsatz ${eur(bet)} · Linien ${res.lineWins.length}`);
 
-    await wait(900);
-    ttcClose();
-  }
-}
+      // Power-Spins trigger?
+      const trigger = slot.features.powerSpins && win >= slot.features.powerTriggerMultiplier * bet;
+      if (trigger) {
+        pendingPower = { baseWin: win, bet, slotId: slot.id };
+        openPowerModal(pendingPower);
+      } else {
+        // Add win to balance immediately
+        state.balance = Math.round((state.balance + win) * 100) / 100;
+        saveState();
+        renderBalance();
+      }
+    } else {
+      setStatus("Kein Gewinn.");
+      log(`<b>Lose:</b> Einsatz ${eur(bet)}`);
+    }
 
-function ttcCollect(){
-  if (!ttc.active) return;
-
-  if (ttc.pending > 0) {
-    state.credits += ttc.pending;
-    saveCurrentState();
-    syncHUD();
-    setMsg(`COLLECT: +${ttc.pending} (Triple-Triple Chance)`);
-  } else {
-    setMsg("Triple-Triple Chance: nichts zu collecten.");
+    isSpinning = false;
+    setControlsEnabled(true);
   }
 
-  ttcClose();
-}
-
-ttcSpinBtn.onclick = ttcSpin;
-ttcCollectBtn.onclick = ttcCollect;
-ttcModal.addEventListener("click", (e) => {
-  if (e.target === ttcModal) ttcCollect();
-});
-
-/* =========================
-   Play flow
-========================= */
-async function spinOnce() {
-  if (spinning || ttc.active) return;
-
-  const lines = enabledLines();
-  if (lines.length === 0) {
-    setMsg("Aktiviere mindestens 1 Linie im Builder (Admin).");
-    return;
+  function wait(ms) {
+    return new Promise(res => setTimeout(res, ms));
   }
 
-  const totalBet = state.betPerLine * lines.length;
-  if (state.credits < totalBet) {
-    setMsg(`Zu wenig Credits. Du brauchst ${totalBet}.`);
-    return;
+  /* -------------------------
+     Power-Spins
+  ------------------------- */
+  function openPowerModal(info) {
+    const slot = getAllSlots()[info.slotId] || getSelectedSlot();
+    const maxSpins = Math.max(1, Math.floor(info.baseWin / info.bet));
+    powerBuyRange.min = "1";
+    powerBuyRange.max = String(maxSpins);
+    powerBuyRange.value = String(Math.min(3, maxSpins));
+
+    const winText = eur(info.baseWin);
+    powerModalText.innerHTML =
+      `Du hast <b>${winText}</b> gewonnen (≥ ${slot.features.powerTriggerMultiplier}× Einsatz).<br/>
+       Du kannst den Gewinn nehmen oder einen Teil davon in <b>Power-Spins</b> investieren.<br/>
+       In Power-Spins spielst du auf <b>4 Feldern gleichzeitig</b> und die Chance auf Sondersymbole ist erhöht.`;
+
+    syncPowerBuyText(info.bet);
+
+    powerModalOverlay.classList.remove("hidden");
   }
 
-  if (audioOn) ensureAudio();
-
-  spinning = true;
-  state.credits -= totalBet;
-  saveCurrentState();
-  syncHUD();
-
-  const intervals = startSpinAnimation();
-  const finalGrid = generateOutcome();
-
-  for (let r=0; r<def.reels; r++) {
-    await wait(450 + r*220);
-    const colSyms = [];
-    for (let row=0; row<def.rows; row++) colSyms.push(finalGrid[row][r]);
-    stopReel(intervals, r, colSyms);
+  function closePowerModalNow() {
+    powerModalOverlay.classList.add("hidden");
   }
 
-  const res = evaluate(finalGrid, state.betPerLine);
-
-  if (res.totalWin > 0) {
-    state.credits += res.totalWin;
-    saveCurrentState();
-    syncHUD();
-    setMsg(`WIN: +${res.totalWin} Credits`);
-    winJingle();
-    renderWins(res.wins);
-    highlightWins(res.wins);
-  } else {
-    setMsg("Kein Gewinn. Versuch’s nochmal.");
+  function syncPowerBuyText(bet) {
+    const spins = Number(powerBuyRange.value);
+    powerBuySpins.textContent = spins === 1 ? "1 Spin" : `${spins} Spins`;
+    powerBuyCost.textContent = `${eur(spins * bet)} (aus Gewinn)`;
   }
 
-  // Feature Trigger: Vollbild + enabled
-  if (def.features?.ttChanceEnabled && isFullScreen(finalGrid)) {
-    const base = Math.max(0, res.totalWin|0);
-    if (base > 0) {
+  async function startPowerSpins({ baseWin, bet, slotId }, spinsToBuy) {
+    const slot = getAllSlots()[slotId] || getSelectedSlot();
+
+    // Invest cost from win
+    const cost = Math.round(spinsToBuy * bet * 100) / 100;
+    const immediate = Math.round((baseWin - cost) * 100) / 100;
+
+    // Pay immediate remainder now
+    state.balance = Math.round((state.balance + immediate) * 100) / 100;
+    saveState();
+    renderBalance();
+
+    // Show power panel
+    powerPanel.classList.remove("hidden");
+    powerWinEl.textContent = eur(0);
+    powerMeta.textContent = `${spinsToBuy} Spin(s) · Einsatz ${eur(bet)} · 4 Felder`;
+    powerStatus.textContent = "Power-Spins laufen...";
+
+    let powerTotal = 0;
+    let spinsLeft = spinsToBuy;
+
+    // Lock base controls during power
+    isSpinning = true;
+    setControlsEnabled(false);
+
+    while (spinsLeft > 0) {
+      // Spin all 4 boards
+      for (const b of pBoards) {
+        clearWinHighlights(b);
+        boardSpinAnim(b, true);
+      }
+
+      const rawBoards = [];
+      for (let i = 0; i < 4; i++) rawBoards.push(generateGrid(slot, "power"));
+
+      // Render raw first (animation feel)
+      for (let i = 0; i < 4; i++) renderBoard(pBoards[i], slot, rawBoards[i]);
+
+      await wait(700);
+
+      // Evaluate each board
+      let spinWin = 0;
+      for (let i = 0; i < 4; i++) {
+        const { evalGrid } = applyMysteryAndWild(slot, rawBoards[i], "power");
+        const res = evaluateWins(slot, evalGrid, bet);
+
+        for (const b of pBoards) boardSpinAnim(b, false);
+
+        // Highlight on that board
+        clearWinHighlights(pBoards[i]);
+        for (const lw of res.lineWins) highlightPositions(pBoards[i], lw.positions);
+
+        spinWin += res.totalWin;
+      }
+
+      spinWin = Math.round(spinWin * 100) / 100;
+      powerTotal = Math.round((powerTotal + spinWin) * 100) / 100;
+
+      powerWinEl.textContent = eur(powerTotal);
+      powerStatus.textContent = `Spin gewonnen: ${eur(spinWin)} · Übrig: ${spinsLeft - 1}`;
+
+      // Optional: re-trigger mechanic (small spice) — if very big spin in power, +1 extra spin
+      if (spinWin >= 4 * bet) {
+        spinsLeft += 1;
+        powerStatus.textContent += " · +1 Extra Power-Spin!";
+        log(`<b>Power Bonus:</b> +1 Extra Spin (SpinWin ${eur(spinWin)})`);
+      }
+
+      spinsLeft -= 1;
       await wait(450);
-      ttcOpen(base);
+    }
+
+    // Pay power winnings
+    state.balance = Math.round((state.balance + powerTotal) * 100) / 100;
+    saveState();
+    renderBalance();
+
+    log(`<b>Power-Spins Ende:</b> +${eur(powerTotal)} (aus investiertem Gewinn)`);
+    powerStatus.textContent = `Fertig. Power-Gewinn: ${eur(powerTotal)} wurde gutgeschrieben.`;
+
+    isSpinning = false;
+    setControlsEnabled(true);
+  }
+
+  /* -------------------------
+     Daily Wheel (24h)
+  ------------------------- */
+  const WHEEL_VALUES = [10,20,30,40,50,60,70,80,90,100];
+
+  function wheelReady() {
+    return Date.now() >= (state.lastWheelAt || 0) + DAY_MS;
+  }
+
+  function openWheelModal() {
+    updateWheelModalText();
+    wheelModalOverlay.classList.remove("hidden");
+  }
+
+  function closeWheelModalNow() {
+    wheelModalOverlay.classList.add("hidden");
+  }
+
+  function updateWheelModalText() {
+    const now = Date.now();
+    const next = (state.lastWheelAt || 0) + DAY_MS;
+    if (now >= next) {
+      wheelReadyText.textContent = "Bereit zum Drehen ✅";
+      spinWheelBtn.disabled = false;
+    } else {
+      const ms = next - now;
+      const h = Math.floor(ms / (60*60*1000));
+      const m = Math.floor((ms % (60*60*1000)) / (60*1000));
+      const s = Math.floor((ms % (60*1000)) / 1000);
+      wheelReadyText.textContent = `Noch nicht bereit. Wieder in ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+      spinWheelBtn.disabled = true;
     }
   }
 
-  spinBtn.disabled = false;
-  simBtn.disabled = false;
-  betDown.disabled = false;
-  betUp.disabled = false;
-  spinning = false;
+  let wheelSpinning = false;
 
-  if (state.auto && !ttc.active) {
-    autoTimer = setTimeout(spinOnce, 350);
+  async function spinDailyWheel() {
+    if (wheelSpinning) return;
+    if (!wheelReady()) {
+      updateWheelModalText();
+      return;
+    }
+    wheelSpinning = true;
+    spinWheelBtn.disabled = true;
+
+    const index = randInt(0, WHEEL_VALUES.length - 1);
+    const prize = WHEEL_VALUES[index];
+
+    // Wheel has 10 segments => 36 degrees each.
+    // We rotate so that chosen segment lands at pointer (top).
+    // Add multiple turns for animation.
+    const segmentDeg = 360 / WHEEL_VALUES.length;
+    const targetDeg = (360 - (index * segmentDeg) - (segmentDeg / 2));
+    const extraTurns = 5 * 360;
+    const finalDeg = extraTurns + targetDeg + randInt(-6, 6);
+
+    wheel.style.transform = `rotate(${finalDeg}deg)`;
+    wheelInfo.textContent = "Dreht...";
+
+    await wait(2700);
+
+    // Apply prize
+    state.balance = Math.round((state.balance + prize) * 100) / 100;
+    state.lastWheelAt = Date.now();
+    saveState();
+
+    renderBalance();
+    updateWheelCooldownUI();
+    updateWheelModalText();
+
+    wheelInfo.innerHTML = `Gewonnen: <b>${eur(prize)}</b> ✅`;
+    log(`<b>Daily Wheel:</b> +${eur(prize)}`);
+
+    wheelSpinning = false;
+    spinWheelBtn.disabled = false;
   }
-}
 
-/* RTP sim (Admin only button visible anyway) */
-function simulate(spins = 10000) {
-  const lines = enabledLines();
-  if (lines.length === 0) {
-    setMsg("RTP Test: keine Linien aktiv.");
-    return;
+  /* -------------------------
+     Admin Mode (Ctrl+Alt+#)
+  ------------------------- */
+  const ADMIN_PASSWORD = "1403";
+
+  function tryOpenAdmin() {
+    const pwd = prompt("Admin Passwort:");
+    if (pwd !== ADMIN_PASSWORD) {
+      alert("Falsch.");
+      return;
+    }
+    adminBalanceInput.value = String(state.balance.toFixed(2));
+    refreshBuilderJson();
+    adminOverlay.classList.remove("hidden");
   }
-  const bet = Math.max(1, state.betPerLine|0);
-  const totalBet = bet * lines.length;
 
-  let wagered = 0;
-  let won = 0;
-  for (let i=0;i<spins;i++) {
-    const g = generateOutcome();
-    const res = evaluate(g, bet);
-    wagered += totalBet;
-    won += res.totalWin;
+  function closeAdminNow() {
+    adminOverlay.classList.add("hidden");
   }
-  const rtp = wagered > 0 ? (won / wagered) * 100 : 0;
-  setMsg(`RTP Test (${spins} Spins): ca. ${rtp.toFixed(2)}% (Gewonnen ${won} / Einsatz ${wagered})`);
-}
 
-/* =========================
-   Builder UI (unverändert)
-========================= */
-function tdInput(val, onChange) {
-  const td = document.createElement("td");
-  const inp = document.createElement("input");
-  inp.value = String(val ?? "");
-  inp.oninput = () => onChange(inp.value);
-  td.appendChild(inp);
-  return td;
-}
-function tdInputNum(val, min, max, onChange) {
-  const td = document.createElement("td");
-  const inp = document.createElement("input");
-  inp.type = "number";
-  inp.min = String(min);
-  inp.max = String(max);
-  inp.step = "1";
-  inp.value = String(val ?? 0);
-  inp.oninput = () => {
-    const v = Math.max(min, Math.min(max, Number(inp.value)|0));
-    onChange(v);
-  };
-  td.appendChild(inp);
-  return td;
-}
+  function exportAllData() {
+    const dataStr = JSON.stringify(state, null, 2);
+    copyToClipboard(dataStr);
+    alert("Save JSON wurde in die Zwischenablage kopiert.");
+  }
 
-function renderBuilder() {
-  if (!isAdmin) return;
+  function resetAll() {
+    if (!confirm("Wirklich ALLES zurücksetzen? (Balance, Slots, Wheel, etc.)")) return;
+    state = { ...defaultState };
+    saveState();
+    initUI();
+    alert("Zurückgesetzt.");
+  }
 
-  bName.value = def.name;
-  bStartCredits.value = String(def.startCredits);
-  bAccent.value = def.accent;
-  bReelMode.value = def.reelMode === "stacked" ? "stacked" : "independent";
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  }
 
-  bTTEnabled.checked = !!def.features?.ttChanceEnabled;
-  bTTGreens.value = String(def.features?.ttGreens ?? 3);
-  bTTReds.value = String(def.features?.ttReds ?? 1);
-  bTTMaxRounds.value = String(def.features?.ttMaxRounds ?? 0);
+  /* -------------------------
+     Builder (Slots hinzufügen ohne andere zu zerstören)
+  ------------------------- */
+  function slugify(s) {
+    return String(s || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^\wäöüß]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  }
 
-  bLines.innerHTML = "";
-  def.lines.forEach((l, idx) => {
-    const item = document.createElement("div");
-    item.className = "lineItem";
+  function refreshBuilderJson() {
+    const all = getAllSlots();
+    const id = builderSlotSelect.value || state.selectedSlotId;
+    const cfg = all[id] || getSelectedSlot();
+    builderJson.value = JSON.stringify(cfg, null, 2);
+    builderSlotSelect.value = id;
+  }
 
-    const lab = document.createElement("label");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !!l.enabled;
-    cb.onchange = () => { def.lines[idx].enabled = cb.checked; };
-    const txt = document.createElement("div");
-    txt.innerHTML = `<b>${l.name}</b><div style="color:var(--muted);font-size:12px;margin-top:2px;">Pattern: ${normalizePattern(l.pattern, def.reels).join("-")}</div>`;
-    lab.appendChild(cb);
-    lab.appendChild(txt);
+  function saveBuilderJson() {
+    let obj;
+    try {
+      obj = JSON.parse(builderJson.value);
+    } catch (e) {
+      alert("JSON Fehler: " + e.message);
+      return;
+    }
+    const validated = validateSlotConfig(obj);
+    if (!validated.ok) {
+      alert("Config ungültig:\n- " + validated.errors.join("\n- "));
+      return;
+    }
 
-    const badge = document.createElement("div");
-    badge.className = "badge";
-    badge.textContent = `ID: ${l.id}`;
+    // Built-in slots dürfen nicht direkt überschrieben werden -> wir speichern als Custom Slot
+    const isBuiltIn = (obj.id === "lucky_pharaoh");
+    const id = isBuiltIn ? (obj.id + "_custom_" + randInt(1000,9999)) : obj.id;
 
-    item.appendChild(lab);
-    item.appendChild(badge);
-    bLines.appendChild(item);
+    obj.id = id;
+    state.customSlots[id] = obj;
+    state.selectedSlotId = id;
+
+    saveState();
+    fillSlotOptions();
+    slotSelect.value = state.selectedSlotId;
+    builderSlotSelect.value = state.selectedSlotId;
+    renderTopMeta();
+    renderSlotMetaPanel();
+
+    alert("Gespeichert als Custom Slot: " + obj.name + " (" + obj.id + ")");
+  }
+
+  function validateSlotConfig(cfg) {
+    const errors = [];
+    const req = (cond, msg) => { if (!cond) errors.push(msg); };
+
+    req(cfg && typeof cfg === "object", "Config muss ein Objekt sein.");
+    if (!cfg || typeof cfg !== "object") return { ok: false, errors };
+
+    req(typeof cfg.id === "string" && cfg.id.length >= 3, "id (string) fehlt/zu kurz.");
+    req(typeof cfg.name === "string" && cfg.name.length >= 2, "name (string) fehlt/zu kurz.");
+    req(cfg.reels === 5, "reels muss 5 sein (Fix).");
+    req(cfg.rows === 3, "rows muss 3 sein (Fix).");
+    req(cfg.paylines === 10, "paylines muss 10 sein (Fix).");
+
+    req(cfg.features && typeof cfg.features === "object", "features fehlt.");
+    req(cfg.symbols && Array.isArray(cfg.symbols) && cfg.symbols.length >= 6, "symbols muss Array sein (min 6).");
+    req(cfg.weights && cfg.weights.base && cfg.weights.power, "weights.base/power fehlen.");
+    req(cfg.paytable && typeof cfg.paytable === "object", "paytable fehlt.");
+
+    // basic checks
+    if (cfg.symbols && Array.isArray(cfg.symbols)) {
+      const keys = cfg.symbols.map(s => s.key);
+      req(new Set(keys).size === keys.length, "symbols keys müssen eindeutig sein.");
+    }
+
+    return { ok: errors.length === 0, errors };
+  }
+
+  function builderNewSlot() {
+    const name = prompt("Name für neuen Slot:");
+    if (!name) return;
+
+    const id = slugify(name) || ("slot_" + randInt(1000,9999));
+    const base = makeLuckyPharaohSlot();
+    const newCfg = structuredClone(base);
+
+    newCfg.id = id;
+    newCfg.name = name;
+
+    // small variation: slightly different weights by default
+    newCfg.weights.base[SYM.LP] = Math.max(1, newCfg.weights.base[SYM.LP] - 1);
+    newCfg.weights.power[SYM.LP] = Math.max(1, newCfg.weights.power[SYM.LP] - 1);
+
+    state.customSlots[id] = newCfg;
+    state.selectedSlotId = id;
+    saveState();
+
+    fillSlotOptions();
+    slotSelect.value = id;
+    builderSlotSelect.value = id;
+    refreshBuilderJson();
+    renderTopMeta();
+    renderSlotMetaPanel();
+
+    alert("Neuer Slot erstellt (Custom): " + name);
+  }
+
+  function builderCloneSelected() {
+    const all = getAllSlots();
+    const srcId = builderSlotSelect.value || state.selectedSlotId;
+    const src = all[srcId];
+    if (!src) return;
+
+    const clone = structuredClone(src);
+    clone.id = `${src.id}_clone_${randInt(1000,9999)}`;
+    clone.name = `${src.name} (Clone)`;
+
+    state.customSlots[clone.id] = clone;
+    state.selectedSlotId = clone.id;
+    saveState();
+
+    fillSlotOptions();
+    slotSelect.value = clone.id;
+    builderSlotSelect.value = clone.id;
+    refreshBuilderJson();
+    renderTopMeta();
+    renderSlotMetaPanel();
+
+    alert("Geklont: " + clone.name);
+  }
+
+  function builderDeleteSelected() {
+    const id = builderSlotSelect.value || state.selectedSlotId;
+    if (!state.customSlots[id]) {
+      alert("Nur Custom Slots können gelöscht werden.");
+      return;
+    }
+    if (!confirm("Custom Slot löschen? " + id)) return;
+
+    delete state.customSlots[id];
+
+    // fallback
+    state.selectedSlotId = "lucky_pharaoh";
+    saveState();
+
+    fillSlotOptions();
+    slotSelect.value = state.selectedSlotId;
+    builderSlotSelect.value = state.selectedSlotId;
+    refreshBuilderJson();
+    renderTopMeta();
+    renderSlotMetaPanel();
+
+    alert("Gelöscht.");
+  }
+
+  function builderExportSlot() {
+    const all = getAllSlots();
+    const id = builderSlotSelect.value || state.selectedSlotId;
+    const cfg = all[id];
+    if (!cfg) return;
+
+    const str = JSON.stringify(cfg, null, 2);
+    copyToClipboard(str);
+    alert("Slot JSON wurde kopiert.");
+  }
+
+  function builderImportSlot() {
+    const str = prompt("Slot JSON hier einfügen:");
+    if (!str) return;
+
+    let obj;
+    try { obj = JSON.parse(str); }
+    catch (e) { alert("JSON Fehler: " + e.message); return; }
+
+    const validated = validateSlotConfig(obj);
+    if (!validated.ok) {
+      alert("Ungültig:\n- " + validated.errors.join("\n- "));
+      return;
+    }
+
+    // Always store as custom to avoid breaking built-ins
+    const id = obj.id && obj.id !== "lucky_pharaoh" ? obj.id : ("import_" + randInt(1000,9999));
+    obj.id = id;
+
+    state.customSlots[id] = obj;
+    state.selectedSlotId = id;
+    saveState();
+
+    fillSlotOptions();
+    slotSelect.value = id;
+    builderSlotSelect.value = id;
+    refreshBuilderJson();
+    renderTopMeta();
+    renderSlotMetaPanel();
+
+    alert("Importiert: " + obj.name + " (" + obj.id + ")");
+  }
+
+  /* -------------------------
+     Extra UI
+  ------------------------- */
+  function renderSlotMetaPanel() {
+    const slot = getSelectedSlot();
+    renderTopMeta();
+    // Ensure base board exists
+    const grid = generateGrid(slot, "base");
+    renderBoard(baseBoardEl, slot, grid);
+  }
+
+  /* -------------------------
+     Events
+  ------------------------- */
+  spinBtn.addEventListener("click", spinBase);
+
+  wheelBtn.addEventListener("click", () => {
+    openWheelModal();
+    updateWheelModalText();
   });
 
-  symbolTbody.innerHTML = "";
-  def.symbols.forEach((s, idx) => {
-    const tr = document.createElement("tr");
+  closeWheelModal.addEventListener("click", closeWheelModalNow);
+  spinWheelBtn.addEventListener("click", spinDailyWheel);
 
-    tr.appendChild(tdInput(s.icon, (v)=>def.symbols[idx].icon = v));
-    tr.appendChild(tdInput(s.name, (v)=>def.symbols[idx].name = v));
-    tr.appendChild(tdInputNum(s.weight, 1, 999, (v)=>def.symbols[idx].weight = v));
-    tr.appendChild(tdInputNum(s.pay[3] ?? 0, 0, 999999, (v)=>def.symbols[idx].pay[3] = v));
-    tr.appendChild(tdInputNum(s.pay[4] ?? 0, 0, 999999, (v)=>def.symbols[idx].pay[4] = v));
-    tr.appendChild(tdInputNum(s.pay[5] ?? 0, 0, 999999, (v)=>def.symbols[idx].pay[5] = v));
-
-    const tdDel = document.createElement("td");
-    const del = document.createElement("button");
-    del.className = "mini del";
-    del.textContent = "Löschen";
-    del.onclick = () => {
-      if (def.symbols.length <= 3) return alert("Mindestens 3 Symbole lassen.");
-      def.symbols.splice(idx,1);
-      renderBuilder();
-    };
-    tdDel.appendChild(del);
-    tr.appendChild(tdDel);
-
-    symbolTbody.appendChild(tr);
+  slotSelect.addEventListener("change", () => {
+    state.selectedSlotId = slotSelect.value;
+    saveState();
+    renderSlotMetaPanel();
+    fillSlotOptions(); // keep builder in sync
   });
 
-  jsonBox.value = JSON.stringify(def, null, 2);
-}
-
-function applyBuilderToDef() {
-  if (!isAdmin) return;
-
-  def.name = String(bName.value || "My Slot");
-  def.startCredits = Math.max(0, Number(bStartCredits.value)|0);
-  def.accent = String(bAccent.value || "#00e5ff");
-  def.reelMode = (bReelMode.value === "stacked") ? "stacked" : "independent";
-
-  def.features = def.features || {};
-  def.features.ttChanceEnabled = !!bTTEnabled.checked;
-  def.features.ttGreens = clampInt(bTTGreens.value, 1, 20);
-  def.features.ttReds = clampInt(bTTReds.value, 1, 20);
-  def.features.ttMaxRounds = clampInt(bTTMaxRounds.value, 0, 99);
-
-  def = normalizeDef(def);
-  setCurrentDef(def);
-
-  weightedBag = buildWeightedBag();
-  applyAccent();
-
-  renderReels();
-  for (let r=0;r<def.reels;r++){
-    if (def.reelMode === "stacked") {
-      const sym = randomSymbolFromBag();
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
-    } else {
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
-    }
-  }
-
-  renderSlotSelects();
-  syncHUD();
-  setMsg("Builder gespeichert. Play ist aktualisiert.");
-}
-
-/* Slot management (Admin) */
-function createNewSlot(){
-  const id = `slot_${Date.now()}`;
-  const newDef = normalizeDef({ ...structuredClone(DEFAULT_DEF), name: `New Slot ${slots.length+1}` });
-  slots.push({ id, def: newDef });
-  saveSlots();
-  currentSlotId = id;
-  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
-
-  def = getCurrentDef();
-  weightedBag = buildWeightedBag();
-  state = { credits: def.startCredits, betPerLine: 1, auto: false };
-  stateMap[currentSlotId] = state;
-  saveStateMap();
-
-  applyAccent();
-  renderSlotSelects();
-  renderReels();
-  syncHUD();
-  renderBuilder();
-}
-function duplicateSlot(){
-  const id = `slot_${Date.now()}`;
-  const copy = normalizeDef({ ...structuredClone(def), name: def.name + " (Copy)" });
-  slots.push({ id, def: copy });
-  saveSlots();
-  renderSlotSelects();
-}
-function deleteSlot(){
-  if (slots.length <= 1) return alert("Mindestens 1 Slot muss bleiben.");
-  if (!confirm("Diesen Slot wirklich löschen?")) return;
-
-  const idx = slots.findIndex(s => s.id === currentSlotId);
-  if (idx < 0) return;
-
-  const removed = slots.splice(idx, 1)[0];
-  delete stateMap[removed.id];
-  saveStateMap();
-  saveSlots();
-
-  currentSlotId = slots[0].id;
-  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
-  def = getCurrentDef();
-  state = getCurrentState();
-  weightedBag = buildWeightedBag();
-
-  applyAccent();
-  renderSlotSelects();
-  renderReels();
-  syncHUD();
-  renderBuilder();
-}
-
-/* =========================
-   Events
-========================= */
-slotSelect.onchange = () => switchSlot(slotSelect.value);
-bSlotSelect.onchange = () => {
-  if (!isAdmin) return;
-  switchSlot(bSlotSelect.value);
-  renderBuilder();
-};
-
-function switchSlot(id){
-  if (!slots.some(s => s.id === id)) return;
-  currentSlotId = id;
-  localStorage.setItem(LS_CURRENT_SLOT, currentSlotId);
-
-  def = getCurrentDef();
-  state = getCurrentState();
-  weightedBag = buildWeightedBag();
-
-  applyAccent();
-  renderSlotSelects();
-  renderReels();
-
-  for (let r=0;r<def.reels;r++){
-    if (def.reelMode === "stacked") {
-      const sym = randomSymbolFromBag();
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
-    } else {
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
-    }
-  }
-
-  state.auto = false;
-  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
-  saveCurrentState();
-  if (ttc.active) ttcClose();
-
-  syncHUD();
-  setMsg(`Slot gewechselt: ${def.name}`);
-}
-
-spinBtn.onclick = () => spinOnce();
-
-autoBtn.onclick = () => {
-  if (ttc.active) return;
-  state.auto = !state.auto;
-  saveCurrentState();
-  syncHUD();
-  if (!state.auto && autoTimer) {
-    clearTimeout(autoTimer);
-    autoTimer = null;
-  }
-  if (state.auto && !spinning) spinOnce();
-};
-
-simBtn.onclick = () => simulate(10000);
-
-betDown.onclick = () => {
-  state.betPerLine = Math.max(1, (state.betPerLine|0) - 1);
-  saveCurrentState();
-  syncHUD();
-};
-betUp.onclick = () => {
-  state.betPerLine = Math.min(100, (state.betPerLine|0) + 1);
-  saveCurrentState();
-  syncHUD();
-};
-
-soundToggle.onclick = async () => {
-  audioOn = !audioOn;
-  if (audioOn) {
-    ensureAudio();
-    if (AC && AC.state === "suspended") await AC.resume();
-    beep(440, 80, "triangle", 0.06);
-  }
-  syncHUD();
-};
-
-resetCredits.onclick = () => {
-  state.credits = def.startCredits;
-  saveCurrentState();
-  syncHUD();
-  setMsg("Credits zurückgesetzt.");
-};
-
-addSymbolBtn.onclick = () => {
-  if (!isAdmin) return;
-  def.symbols.push({
-    id: `sym_${Date.now()}`,
-    icon: "🟣",
-    name: "New",
-    weight: 10,
-    pay:{3:5,4:20,5:120}
+  betSelect.addEventListener("change", () => {
+    state.bet = Number(betSelect.value);
+    saveState();
+    setStatus("Einsatz gesetzt: " + eur(state.bet));
   });
-  renderBuilder();
-};
 
-exportBtn.onclick = () => {
-  jsonBox.value = JSON.stringify(def, null, 2);
-  jsonBox.focus();
-  jsonBox.select();
-};
-
-importBtn.onclick = () => {
-  if (!isAdmin) return;
-  try {
-    const parsed = JSON.parse(jsonBox.value);
-    def = normalizeDef(parsed);
-    setCurrentDef(def);
-    renderBuilder();
-    alert("Import OK. Jetzt 'Speichern & Anwenden' drücken.");
-  } catch (e) {
-    alert("JSON ungültig: " + e.message);
-  }
-};
-
-saveBtn.onclick = () => {
-  applyBuilderToDef();
-  showPlay();
-};
-
-newSlotBtn.onclick = () => { if (isAdmin) createNewSlot(); };
-dupSlotBtn.onclick = () => { if (isAdmin) duplicateSlot(); };
-delSlotBtn.onclick = () => { if (isAdmin) deleteSlot(); };
-
-/* =========================
-   Boot
-========================= */
-function boot() {
-  def = normalizeDef(def);
-  weightedBag = buildWeightedBag();
-  applyAccent();
-
-  renderSlotSelects();
-  applyAdminUI();
-  renderReels();
-
-  for (let r=0;r<def.reels;r++){
-    if (def.reelMode === "stacked") {
-      const sym = randomSymbolFromBag();
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], sym);
-    } else {
-      for (let row=0;row<def.rows;row++) renderCell(cellMatrix[row][r], randomSymbolFromBag());
+  // Power modal interactions
+  closePowerModal.addEventListener("click", () => {
+    // If player closes: treat as taking win
+    if (pendingPower) {
+      const w = pendingPower.baseWin;
+      state.balance = Math.round((state.balance + w) * 100) / 100;
+      saveState();
+      renderBalance();
+      log(`<b>Power-Spins abgelehnt:</b> Gewinn ${eur(w)} gutgeschrieben.`);
+      pendingPower = null;
     }
+    closePowerModalNow();
+  });
+
+  powerBuyRange.addEventListener("input", () => {
+    if (!pendingPower) return;
+    syncPowerBuyText(pendingPower.bet);
+  });
+
+  takeWinBtn.addEventListener("click", () => {
+    if (!pendingPower) return;
+    const w = pendingPower.baseWin;
+    state.balance = Math.round((state.balance + w) * 100) / 100;
+    saveState();
+    renderBalance();
+    log(`<b>Gewinn genommen:</b> +${eur(w)} (kein Power)`);
+    pendingPower = null;
+    closePowerModalNow();
+  });
+
+  buyPowerBtn.addEventListener("click", async () => {
+    if (!pendingPower) return;
+    const info = pendingPower;
+    const spins = Number(powerBuyRange.value);
+
+    const maxSpins = Math.max(1, Math.floor(info.baseWin / info.bet));
+    if (spins < 1 || spins > maxSpins) {
+      alert("Ungültige Spin-Anzahl.");
+      return;
+    }
+
+    log(`<b>Power gekauft:</b> ${spins} Spins (Kosten ${eur(spins * info.bet)})`);
+    pendingPower = null;
+    closePowerModalNow();
+    await startPowerSpins(info, spins);
+  });
+
+  // Admin modal
+  closeAdmin.addEventListener("click", closeAdminNow);
+  adminSetBalanceBtn.addEventListener("click", () => {
+    const v = Number(adminBalanceInput.value);
+    if (!Number.isFinite(v) || v < 0) return alert("Ungültig.");
+    state.balance = Math.round(v * 100) / 100;
+    saveState();
+    renderBalance();
+    alert("Balance gesetzt: " + eur(state.balance));
+  });
+  adminResetWheelBtn.addEventListener("click", () => {
+    state.lastWheelAt = 0;
+    saveState();
+    updateWheelCooldownUI();
+    updateWheelModalText();
+    alert("Wheel Cooldown zurückgesetzt.");
+  });
+  adminExportDataBtn.addEventListener("click", exportAllData);
+  adminResetAllBtn.addEventListener("click", resetAll);
+
+  // Builder
+  builderSlotSelect.addEventListener("change", refreshBuilderJson);
+  builderSaveBtn.addEventListener("click", saveBuilderJson);
+  builderNewBtn.addEventListener("click", builderNewSlot);
+  builderCloneBtn.addEventListener("click", builderCloneSelected);
+  builderDeleteBtn.addEventListener("click", builderDeleteSelected);
+  builderExportSlotBtn.addEventListener("click", builderExportSlot);
+  builderImportSlotBtn.addEventListener("click", builderImportSlot);
+
+  // Key combo: Ctrl+Alt+# (German AltGr = Ctrl+Alt + Digit3)
+  window.addEventListener("keydown", (e) => {
+    const ctrlAlt = e.ctrlKey && e.altKey;
+    const isHash = (e.key === "#") || (e.code === "Digit3") || (e.code === "Backslash");
+    if (ctrlAlt && isHash) {
+      e.preventDefault();
+      tryOpenAdmin();
+    }
+  });
+
+  /* -------------------------
+     Init
+  ------------------------- */
+  function initUI() {
+    renderBalance();
+    fillBetOptions();
+    fillSlotOptions();
+    renderSlotMetaPanel();
+    updateWheelCooldownUI();
+
+    // Live wheel cooldown tick
+    setInterval(() => {
+      updateWheelCooldownUI();
+      if (!wheelModalOverlay.classList.contains("hidden")) updateWheelModalText();
+    }, 1000);
   }
 
-  syncHUD();
-  setMsg("Bereit. (Ctrl+Alt+# → Admin Unlock)");
-}
-boot();
+  initUI();
+
+})();
