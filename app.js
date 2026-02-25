@@ -4,7 +4,7 @@
   /* =========================
      Storage / State
   ========================= */
-  const STORAGE_KEY = "multiSlotSystem.v2";
+  const STORAGE_KEY = "multiSlotSystem.v3";
   const DAY_MS = 24 * 60 * 60 * 1000;
 
   const defaultState = {
@@ -44,11 +44,9 @@
     crypto.getRandomValues(buf);
     return buf[0] / 2 ** 32;
   }
-
   function randInt(minIncl, maxIncl) {
     return minIncl + Math.floor(rand01() * (maxIncl - minIncl + 1));
   }
-
   function weightedChoice(weightMap) {
     const entries = Object.entries(weightMap).filter(([, w]) => Number(w) > 0);
     let total = 0;
@@ -65,7 +63,6 @@
 
   /* =========================
      Audio Engine (Kulisse + Reel + Win/Lose)
-     (läuft erst nach User-Interaktion)
   ========================= */
   class AudioEngine {
     constructor() {
@@ -75,7 +72,6 @@
       this.ambOsc = null;
       this.started = false;
     }
-
     ensure() {
       if (this.started) return;
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -83,18 +79,16 @@
       this.master.gain.value = 0.22;
       this.master.connect(this.ctx.destination);
 
-      // Ambient: weicher Grundton
       this.ambGain = this.ctx.createGain();
       this.ambGain.gain.value = 0.06;
       this.ambGain.connect(this.master);
 
       this.ambOsc = this.ctx.createOscillator();
       this.ambOsc.type = "sine";
-      this.ambOsc.frequency.value = 55; // low hum
+      this.ambOsc.frequency.value = 55;
       this.ambOsc.connect(this.ambGain);
       this.ambOsc.start();
 
-      // ganz leises "breathing" per LFO
       const lfo = this.ctx.createOscillator();
       lfo.type = "sine";
       lfo.frequency.value = 0.12;
@@ -106,7 +100,6 @@
 
       this.started = true;
     }
-
     blip(freq, dur = 0.06, vol = 0.12, type = "square") {
       if (!this.started) return;
       const o = this.ctx.createOscillator();
@@ -122,23 +115,19 @@
       o.start(t);
       o.stop(t + dur);
     }
-
     reelTick() { this.blip(520 + randInt(-40, 40), 0.05, 0.08, "square"); }
     reelStop() { this.blip(220, 0.08, 0.10, "triangle"); }
     win() { this.blip(740, 0.10, 0.14, "sine"); setTimeout(() => this.blip(980, 0.10, 0.14, "sine"), 90); }
     lose() { this.blip(140, 0.12, 0.11, "sawtooth"); }
   }
-
   const audio = new AudioEngine();
 
   /* =========================
      Slot Config (Lucky Pharaoh)
-     - Wild/Mystery: 🎭
-     - Rubin: 🛑
-     - Smaragd: ❇️
+     Paytable: MULTIPLIKATOR × GESAMTEINSATZ (wie Screenshot)
   ========================= */
   const SYM = {
-    MASK: "MASK",   // 🎭 (wild/mystery)
+    MASK: "MASK",   // 🎭 wild/mystery
     DIA: "DIA",     // 💎
     RUB: "RUB",     // 🛑 (Rubin)
     SAP: "SAP",     // 💠 (Saphir)
@@ -162,7 +151,8 @@
         powerTriggerMultiplier: 4,
         mysterySymbol: SYM.MASK,
         wildMode: true,
-        wildExpandChance: 0.20,
+        // Expand NUR in Power (siehe applyMysteryAndWild), damit Base-RTP stabil bleibt
+        wildExpandChancePower: 0.06,
       },
       symbols: [
         { key: SYM.MASK, label: "🎭" },
@@ -176,6 +166,8 @@
         { key: SYM.J,    label: "J" },
         { key: SYM.T10,  label: "10" },
       ],
+
+      // Base: grob ~88–94% (je nach RNG/Session)
       weights: {
         base: {
           [SYM.MASK]: 7,
@@ -189,29 +181,32 @@
           [SYM.J]: 14,
           [SYM.T10]: 16,
         },
+        // Power: leicht besser (Ziel ~96% pro "Einsatz")
         power: {
-          [SYM.MASK]: 13,
-          [SYM.DIA]: 6,
+          [SYM.MASK]: 7,
+          [SYM.DIA]: 5,
           [SYM.RUB]: 9,
-          [SYM.SAP]: 10,
+          [SYM.SAP]: 9,
           [SYM.EME]: 11,
           [SYM.A]: 12,
           [SYM.K]: 12,
-          [SYM.Q]: 12,
-          [SYM.J]: 12,
-          [SYM.T10]: 14,
+          [SYM.Q]: 15,
+          [SYM.J]: 14,
+          [SYM.T10]: 15,
         }
       },
+
+      // ✅ Screenshot Paytable (Multiplikator auf Gesamteinsatz)
       paytable: {
-        [SYM.DIA]: { 3: 6,   4: 24,  5: 120 },
-        [SYM.RUB]: { 3: 4,   4: 14,  5: 70  },
-        [SYM.SAP]: { 3: 3,   4: 12,  5: 60  },
-        [SYM.EME]: { 3: 3,   4: 10,  5: 50  },
-        [SYM.A]:   { 3: 1.2, 4: 4,   5: 18  },
-        [SYM.K]:   { 3: 1.0, 4: 3.5, 5: 16  },
-        [SYM.Q]:   { 3: 0.9, 4: 3.2, 5: 14  },
-        [SYM.J]:   { 3: 0.8, 4: 3.0, 5: 12  },
-        [SYM.T10]: { 3: 0.7, 4: 2.8, 5: 10  },
+        [SYM.DIA]: { 3: 5,   4: 10,  5: 50 },
+        [SYM.RUB]: { 3: 4,   4: 10,  5: 40 },
+        [SYM.SAP]: { 3: 2,   4: 6,   5: 30 },
+        [SYM.EME]: { 3: 2,   4: 6,   5: 30 },
+        [SYM.A]:   { 3: 1,   4: 4,   5: 20 }, // A/K Gruppe
+        [SYM.K]:   { 3: 1,   4: 4,   5: 20 },
+        [SYM.Q]:   { 3: 0.5, 4: 2,   5: 10 }, // Q/J/10 Gruppe
+        [SYM.J]:   { 3: 0.5, 4: 2,   5: 10 },
+        [SYM.T10]: { 3: 0.5, 4: 2,   5: 10 },
       }
     };
   }
@@ -263,7 +258,6 @@
   const powerWinEl = $("powerWin");
   const pBoards = [ $("pBoard1"), $("pBoard2"), $("pBoard3"), $("pBoard4") ];
 
-  // Power modal
   const powerModalOverlay = $("powerModalOverlay");
   const powerModalText = $("powerModalText");
   const powerBuyRange = $("powerBuyRange");
@@ -273,7 +267,6 @@
   const buyPowerBtn = $("buyPowerBtn");
   const closePowerModal = $("closePowerModal");
 
-  // Wheel modal
   const wheelModalOverlay = $("wheelModalOverlay");
   const wheel = $("wheel");
   const wheelInfo = $("wheelInfo");
@@ -281,7 +274,6 @@
   const spinWheelBtn = $("spinWheelBtn");
   const closeWheelModal = $("closeWheelModal");
 
-  // Admin / Builder
   const adminOverlay = $("adminOverlay");
   const closeAdmin = $("closeAdmin");
   const adminBalanceInput = $("adminBalanceInput");
@@ -308,40 +300,27 @@
     const x = Number(n || 0);
     return "€" + x.toFixed(2);
   }
-
-  function setStatus(msg) {
-    statusText.textContent = msg;
-  }
-
-  function setEvent(msg) {
-    eventBox.innerHTML = msg;
-  }
+  function setStatus(msg) { statusText.textContent = msg; }
+  function setEvent(msg) { eventBox.innerHTML = msg; }
 
   function getSelectedSlot() {
     const all = getAllSlots();
     return all[state.selectedSlotId] || all["lucky_pharaoh"];
   }
-
   function symbolDef(slot, key) {
     return slot.symbols.find(s => s.key === key) || { key, label: key };
   }
-
   function safeClassKey(key) {
-    // "10" => "10", others ok
     return String(key).replace(/[^a-zA-Z0-9_-]/g, "");
   }
-
-  function renderBalance() {
-    balanceEl.textContent = eur(state.balance);
-  }
-
+  function renderBalance() { balanceEl.textContent = eur(state.balance); }
   function renderTopMeta() {
     const slot = getSelectedSlot();
-    slotMetaEl.textContent = `${slot.reels}×${slot.rows} · ${slot.paylines} Linien · Wild/Mystery: 🎭 · Power: ≥ ${slot.features.powerTriggerMultiplier}×`;
+    slotMetaEl.textContent =
+      `${slot.reels}×${slot.rows} · ${slot.paylines} Linien · Paytable = Multiplikator × Gesamteinsatz · Power ≥ ${slot.features.powerTriggerMultiplier}×`;
   }
 
   function fillBetOptions() {
-    // erweitert: +3,4,5,10
     const bets = [0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90,1.00,2.00,3.00,4.00,5.00,10.00];
     betSelect.innerHTML = "";
     for (const b of bets) {
@@ -366,7 +345,6 @@
     if (!all[state.selectedSlotId]) state.selectedSlotId = "lucky_pharaoh";
     slotSelect.value = state.selectedSlotId;
 
-    // builder
     builderSlotSelect.innerHTML = "";
     for (const [id, cfg] of Object.entries(all)) {
       const opt = document.createElement("option");
@@ -394,7 +372,7 @@
   }
 
   /* =========================
-     Board build (keep DOM, update only icons)
+     Board build (keep DOM)
   ========================= */
   function buildBoard(boardEl, slot) {
     boardEl.innerHTML = "";
@@ -404,21 +382,17 @@
       for (let c = 0; c < slot.reels; c++) {
         const cell = document.createElement("div");
         cell.className = "symbol";
-
         const icon = document.createElement("div");
         icon.className = "icon";
         icon.textContent = "?";
         cell.appendChild(icon);
-
         cell.dataset.r = String(r);
         cell.dataset.c = String(c);
-
         boardEl.appendChild(cell);
         cells[r][c] = cell;
       }
     }
-
-    boardEl._cells = cells; // store
+    boardEl._cells = cells;
   }
 
   function setCell(boardEl, slot, r, c, key) {
@@ -428,11 +402,7 @@
     const icon = cell.querySelector(".icon");
 
     cell.classList.remove("win");
-    // remove old sym- classes
-    [...cell.classList].forEach(cl => {
-      if (cl.startsWith("sym-")) cell.classList.remove(cl);
-    });
-
+    [...cell.classList].forEach(cl => { if (cl.startsWith("sym-")) cell.classList.remove(cl); });
     cell.classList.add("sym-" + safeClassKey(key));
     cell.dataset.key = key;
     icon.textContent = def.label;
@@ -450,7 +420,7 @@
   }
 
   /* =========================
-     Grid generation + Mystery/Wild
+     Grid + Mystery/Wild
   ========================= */
   function generateGrid(slot, mode) {
     const weights = mode === "power" ? slot.weights.power : slot.weights.base;
@@ -463,25 +433,22 @@
     return grid;
   }
 
+  // ✅ Expand nur in Power, Base bleibt stabil (RTP)
   function applyMysteryAndWild(slot, grid, mode) {
     const out = grid.map(row => row.slice());
     const mystery = slot.features.mysterySymbol;
     const wildMode = !!slot.features.wildMode;
-    const expandChance = slot.features.wildExpandChance ?? 0;
-
-    const pool = slot.symbols.map(s => s.key).filter(k => k !== mystery);
 
     for (let r = 0; r < slot.rows; r++) {
       for (let c = 0; c < slot.reels; c++) {
         if (out[r][c] === mystery) {
-          if (wildMode) {
-            out[r][c] = WILD;
-            const chanceBoost = (mode === "power") ? 1.15 : 1.0;
-            if (rand01() < (expandChance * chanceBoost)) {
+          if (wildMode) out[r][c] = WILD;
+
+          if (mode === "power") {
+            const ch = Number(slot.features.wildExpandChancePower || 0);
+            if (ch > 0 && rand01() < ch) {
               for (let rr = 0; rr < slot.rows; rr++) out[rr][c] = WILD;
             }
-          } else {
-            out[r][c] = pool[randInt(0, pool.length - 1)] || SYM.DIA;
           }
         }
       }
@@ -490,17 +457,18 @@
   }
 
   /* =========================
-     Win evaluation
-     "Anywhere on the line" -> best consecutive segment >=3
+     Win evaluation (REALISTISCH)
+     - Left-to-Right (klassisch)
+     - payout = MULTIPLIKATOR × GESAMTEINSATZ (wie Screenshot)
   ========================= */
   function evaluateWins(slot, evalGrid, betTotal) {
-    const lineBet = betTotal / slot.paylines;
-
     let totalWin = 0;
     const lineWins = [];
 
     for (let li = 0; li < PAYLINES.length; li++) {
       const pattern = PAYLINES[li];
+
+      // Left-to-Right run
       const seq = [];
       const pos = [];
       for (let c = 0; c < slot.reels; c++) {
@@ -509,64 +477,60 @@
         pos.push({ r, c });
       }
 
-      let best = { amount: 0, symbol: null, length: 0, positions: [] };
+      let base = null;
+      let length = 0;
+      const positions = [];
 
-      for (let start = 0; start < slot.reels; start++) {
-        for (let end = start + 2; end < slot.reels; end++) {
-          const len = end - start + 1;
+      for (let c = 0; c < seq.length; c++) {
+        const s = seq[c];
 
-          let base = null;
-          for (let k = start; k <= end; k++) {
-            if (seq[k] !== WILD) { base = seq[k]; break; }
+        if (base === null) {
+          if (s === WILD) {
+            length++;
+            positions.push(pos[c]);
+          } else {
+            base = s;
+            length++;
+            positions.push(pos[c]);
           }
-          if (!base) base = SYM.DIA; // all wild -> diamond
-
-          let ok = true;
-          for (let k = start; k <= end; k++) {
-            const s = seq[k];
-            if (s !== base && s !== WILD) { ok = false; break; }
-          }
-          if (!ok) continue;
-
-          const pt = slot.paytable[base];
-          if (!pt || !pt[len]) continue;
-
-          const amount = pt[len] * lineBet;
-          if (amount > best.amount) {
-            best = { amount, symbol: base, length: len, positions: pos.slice(start, end + 1) };
+        } else {
+          if (s === base || s === WILD) {
+            length++;
+            positions.push(pos[c]);
+          } else {
+            break;
           }
         }
       }
 
-      if (best.amount > 0) {
-        totalWin += best.amount;
-        lineWins.push({ lineIndex: li, ...best });
+      if (base === null) base = SYM.DIA; // all-wild start -> treat as best symbol
+
+      if (length >= 3) {
+        const pt = slot.paytable[base];
+        const mult = pt?.[length];
+        if (mult) {
+          const amount = Math.round((mult * betTotal) * 100) / 100;
+          totalWin += amount;
+          lineWins.push({ lineIndex: li, amount, symbol: base, length, positions: positions.slice(0, length) });
+        }
       }
     }
 
     totalWin = Math.round(totalWin * 100) / 100;
-    for (const lw of lineWins) lw.amount = Math.round(lw.amount * 100) / 100;
     return { totalWin, lineWins };
   }
 
   /* =========================
-     Reel Animation (real stop per reel)
+     Reel Animation
   ========================= */
   async function spinBoardAnimated(boardEl, slot, mode, finalGrid) {
-    // Adds reelSpinning class and randomizes symbols in each reel while spinning.
     boardEl.classList.add("reelSpinning");
-
     const weights = mode === "power" ? slot.weights.power : slot.weights.base;
 
     const intervals = [];
-    const reelDone = Array(slot.reels).fill(false);
-
     for (let c = 0; c < slot.reels; c++) {
       const iv = setInterval(() => {
-        // tick a bit, not too loud
         audio.reelTick();
-
-        // update 3 visible symbols in that reel
         for (let r = 0; r < slot.rows; r++) {
           const k = weightedChoice(weights);
           setCell(boardEl, slot, r, c, k);
@@ -575,15 +539,11 @@
       intervals.push(iv);
     }
 
-    // sequential stopping
     for (let c = 0; c < slot.reels; c++) {
       const stopDelay = 520 + c * 240;
       await wait(stopDelay);
 
       clearInterval(intervals[c]);
-      reelDone[c] = true;
-
-      // set final symbols for reel column
       for (let r = 0; r < slot.rows; r++) {
         setCell(boardEl, slot, r, c, finalGrid[r][c]);
       }
@@ -591,13 +551,12 @@
     }
 
     boardEl.classList.remove("reelSpinning");
-    return reelDone.every(Boolean);
   }
 
   function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
 
   /* =========================
-     Game Flow + Auto Spin
+     Game Flow + Auto
   ========================= */
   let isSpinning = false;
   let pendingPower = null;
@@ -620,7 +579,7 @@
   }
 
   async function spinBase() {
-    audio.ensure(); // start audio & ambience after first user action
+    audio.ensure();
 
     if (isSpinning) return;
     const slot = getSelectedSlot();
@@ -637,7 +596,6 @@
     isSpinning = true;
     setControlsEnabled(false);
 
-    // deduct bet
     state.balance = Math.round((state.balance - bet) * 100) / 100;
     saveState();
     renderBalance();
@@ -648,12 +606,9 @@
 
     clearWinHighlights(baseBoardEl);
 
-    // generate final grid upfront (so the spin ends consistently)
     const rawGrid = generateGrid(slot, "base");
-
     await spinBoardAnimated(baseBoardEl, slot, "base", rawGrid);
 
-    // evaluate
     const evalGrid = applyMysteryAndWild(slot, rawGrid, "base");
     const res = evaluateWins(slot, evalGrid, bet);
 
@@ -687,7 +642,6 @@
     isSpinning = false;
     setControlsEnabled(true);
 
-    // auto spin scheduling
     if (autoSpin && !pendingPower && powerModalOverlay.classList.contains("hidden") && wheelModalOverlay.classList.contains("hidden")) {
       await wait(900);
       if (autoSpin) spinBase();
@@ -695,18 +649,23 @@
   }
 
   /* =========================
-     Power Spins
+     Power Spins (4 Felder)
+     ✅ Kosten pro Power-Spin = Einsatz × 4
   ========================= */
   function openPowerModal(info) {
     const slot = getAllSlots()[info.slotId] || getSelectedSlot();
-    const maxSpins = Math.max(1, Math.floor(info.baseWin / info.bet));
+
+    const costPerSpin = info.bet * 4;
+    const maxSpins = Math.max(1, Math.floor(info.baseWin / costPerSpin));
+
     powerBuyRange.min = "1";
     powerBuyRange.max = String(maxSpins);
-    powerBuyRange.value = String(Math.min(3, maxSpins));
+    powerBuyRange.value = String(Math.min(2, maxSpins));
 
     powerModalText.innerHTML =
       `Du hast <b>${eur(info.baseWin)}</b> gewonnen (≥ ${slot.features.powerTriggerMultiplier}× Einsatz).<br/>
-       Willst du den Gewinn nehmen oder in <b>Power-Spins</b> investieren?`;
+       Power-Spins laufen auf <b>4 Feldern</b> gleichzeitig.<br/>
+       Deshalb kostet 1 Power-Spin: <b>${eur(costPerSpin)}</b> (Einsatz × 4).`;
 
     syncPowerBuyText(info.bet);
     powerModalOverlay.classList.remove("hidden");
@@ -716,14 +675,15 @@
 
   function syncPowerBuyText(bet) {
     const spins = Number(powerBuyRange.value);
+    const cost = spins * bet * 4;
     powerBuySpins.textContent = spins === 1 ? "1 Spin" : `${spins} Spins`;
-    powerBuyCost.textContent = `${eur(spins * bet)} (aus Gewinn)`;
+    powerBuyCost.textContent = `${eur(cost)} (aus Gewinn)`;
   }
 
   async function startPowerSpins({ baseWin, bet, slotId }, spinsToBuy) {
     const slot = getAllSlots()[slotId] || getSelectedSlot();
 
-    const cost = Math.round(spinsToBuy * bet * 100) / 100;
+    const cost = Math.round(spinsToBuy * bet * 4 * 100) / 100;
     const immediate = Math.round((baseWin - cost) * 100) / 100;
 
     state.balance = Math.round((state.balance + immediate) * 100) / 100;
@@ -732,7 +692,7 @@
 
     powerPanel.classList.remove("hidden");
     powerWinEl.textContent = eur(0);
-    powerMeta.textContent = `${spinsToBuy} Spin(s) · Einsatz ${eur(bet)} · 4 Felder`;
+    powerMeta.textContent = `${spinsToBuy} Spin(s) · Kosten/Spin ${eur(bet * 4)} · 4 Felder`;
     powerStatus.textContent = "Power-Spins laufen...";
 
     isSpinning = true;
@@ -741,7 +701,6 @@
     let powerTotal = 0;
     let spinsLeft = spinsToBuy;
 
-    // build mini boards if missing
     for (const pb of pBoards) {
       if (!pb._cells) buildBoard(pb, slot);
       clearWinHighlights(pb);
@@ -766,14 +725,8 @@
 
       powerStatus.textContent = `Spin gewonnen: ${eur(spinWin)} · Übrig: ${spinsLeft - 1}`;
 
-      // Bonus: großer Gewinn -> +1 extra spin
-      if (spinWin >= 4 * bet) {
-        spinsLeft += 1;
-        powerStatus.textContent += " · +1 Extra!";
-      }
-
       spinsLeft -= 1;
-      await wait(450);
+      await wait(350);
     }
 
     state.balance = Math.round((state.balance + powerTotal) * 100) / 100;
@@ -861,7 +814,7 @@
   }
 
   /* =========================
-     Admin / Builder (unchanged logic, still works)
+     Admin / Builder (wie vorher)
   ========================= */
   const ADMIN_PASSWORD = "1403";
 
@@ -1094,15 +1047,18 @@
   }
 
   /* =========================
-     Init / Rebuild Boards
+     Init / Rebuild
   ========================= */
   function rebuildBoardsForSlot() {
     const slot = getSelectedSlot();
     buildBoard(baseBoardEl, slot);
 
-    // show an idle random grid
     const g = generateGrid(slot, "base");
-    for (let r = 0; r < slot.rows; r++) for (let c = 0; c < slot.reels; c++) setCell(baseBoardEl, slot, r, c, g[r][c]);
+    for (let r = 0; r < slot.rows; r++) {
+      for (let c = 0; c < slot.reels; c++) {
+        setCell(baseBoardEl, slot, r, c, g[r][c]);
+      }
+    }
   }
 
   /* =========================
@@ -1133,7 +1089,7 @@
     saveState();
     renderTopMeta();
     rebuildBoardsForSlot();
-    fillSlotOptions(); // keep builder in sync
+    fillSlotOptions();
     setEvent(`Slot gewechselt: <b>${getSelectedSlot().name}</b>`);
     stopAutoSpin("Slot gewechselt");
   });
@@ -1145,7 +1101,6 @@
     setEvent(`Einsatz: <b>${eur(state.bet)}</b>`);
   });
 
-  // Power modal
   closePowerModal.addEventListener("click", () => {
     if (pendingPower) {
       const w = pendingPower.baseWin;
@@ -1179,7 +1134,7 @@
     const info = pendingPower;
     const spins = Number(powerBuyRange.value);
 
-    const maxSpins = Math.max(1, Math.floor(info.baseWin / info.bet));
+    const maxSpins = Math.max(1, Math.floor(info.baseWin / (info.bet * 4)));
     if (spins < 1 || spins > maxSpins) {
       alert("Ungültige Spin-Anzahl.");
       return;
@@ -1190,9 +1145,22 @@
     await startPowerSpins(info, spins);
   });
 
-  // Admin
-  closeAdmin.addEventListener("click", closeAdminNow);
+  const ADMIN_PASSWORD = "1403";
+  window.addEventListener("keydown", (e) => {
+    const ctrlAlt = e.ctrlKey && e.altKey;
+    const isHash = (e.key === "#") || (e.code === "Digit3") || (e.code === "Backslash");
+    if (ctrlAlt && isHash) {
+      e.preventDefault();
+      const pwd = prompt("Admin Passwort:");
+      if (pwd !== ADMIN_PASSWORD) return alert("Falsch.");
+      adminBalanceInput.value = String(state.balance.toFixed(2));
+      refreshBuilderJson();
+      adminOverlay.classList.remove("hidden");
+      stopAutoSpin("Admin geöffnet");
+    }
+  });
 
+  closeAdmin.addEventListener("click", () => adminOverlay.classList.add("hidden"));
   adminSetBalanceBtn.addEventListener("click", () => {
     const v = Number(adminBalanceInput.value);
     if (!Number.isFinite(v) || v < 0) return alert("Ungültig.");
@@ -1201,7 +1169,6 @@
     renderBalance();
     alert("Balance gesetzt: " + eur(state.balance));
   });
-
   adminResetWheelBtn.addEventListener("click", () => {
     state.lastWheelAt = 0;
     saveState();
@@ -1209,11 +1176,9 @@
     updateWheelModalText();
     alert("Wheel Cooldown zurückgesetzt.");
   });
-
   adminExportDataBtn.addEventListener("click", exportAllData);
   adminResetAllBtn.addEventListener("click", resetAll);
 
-  // Builder
   builderSlotSelect.addEventListener("change", refreshBuilderJson);
   builderSaveBtn.addEventListener("click", saveBuilderJson);
   builderNewBtn.addEventListener("click", builderNewSlot);
@@ -1222,36 +1187,18 @@
   builderExportSlotBtn.addEventListener("click", builderExportSlot);
   builderImportSlotBtn.addEventListener("click", builderImportSlot);
 
-  // Key combo: Ctrl+Alt+# (German AltGr)
-  window.addEventListener("keydown", (e) => {
-    const ctrlAlt = e.ctrlKey && e.altKey;
-    const isHash = (e.key === "#") || (e.code === "Digit3") || (e.code === "Backslash");
-    if (ctrlAlt && isHash) {
-      e.preventDefault();
-      tryOpenAdmin();
-    }
-  });
-
-  /* =========================
-     Wheel tick UI
-  ========================= */
   setInterval(() => {
     updateWheelCooldownUI();
     if (!wheelModalOverlay.classList.contains("hidden")) updateWheelModalText();
   }, 1000);
 
-  /* =========================
-     Init
-  ========================= */
   function initUI() {
     renderBalance();
     fillBetOptions();
     fillSlotOptions();
     renderTopMeta();
-
     rebuildBoardsForSlot();
     updateWheelCooldownUI();
-
     setStatus("Bereit.");
     setEvent("—");
   }
