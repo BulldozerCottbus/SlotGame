@@ -13,7 +13,7 @@
       <div class="logoBadge">SLOTS</div>
       <div class="brandText">
         <div class="title">Multi Slot System</div>
-        <div class="sub">5×3 · 10 Linien · Lucky Pharaoh (Default)</div>
+        <div class="sub">5×3 · 10 Linien · Reel-Animation + Sound</div>
       </div>
     </div>
 
@@ -23,18 +23,7 @@
         <div class="hudValue" id="balance">€0.00</div>
       </div>
 
-      <div class="hudItem">
-        <div class="hudLabel">Slot</div>
-        <select id="slotSelect" class="select"></select>
-      </div>
-
-      <div class="hudItem">
-        <div class="hudLabel">Einsatz</div>
-        <select id="betSelect" class="select"></select>
-      </div>
-
       <div class="hudItem hudButtons">
-        <button id="spinBtn" class="btn primary">SPIN</button>
         <button id="wheelBtn" class="btn">Daily Wheel</button>
       </div>
 
@@ -48,18 +37,36 @@
   </header>
 
   <main class="main">
-
     <section class="panel">
       <div class="panelHeader">
-        <div class="panelTitle">Basisspiel</div>
+        <div class="panelTitle">Slot</div>
         <div class="panelMeta" id="slotMeta">—</div>
+      </div>
+
+      <!-- Slot Auswahl -->
+      <div class="slotRow">
+        <label class="field inline">
+          <span>Slot auswählen</span>
+          <select id="slotSelect" class="select"></select>
+        </label>
       </div>
 
       <div class="gameArea">
         <div id="baseBoard" class="board"></div>
       </div>
 
-      <div class="footerRow">
+      <!-- Controls unter Slot -->
+      <div class="controls">
+        <button id="spinBtn" class="btn primary">SPIN</button>
+        <button id="autoBtn" class="btn">AUTO: AUS</button>
+
+        <label class="betField">
+          <span>Einsatz</span>
+          <select id="betSelect" class="select"></select>
+        </label>
+      </div>
+
+      <div class="resultBar">
         <div class="status" id="statusText">Bereit.</div>
         <div class="winBox">
           <div class="winLabel">Letzter Gewinn</div>
@@ -67,9 +74,11 @@
         </div>
       </div>
 
-      <div class="log" id="log"></div>
+      <!-- Nur 1 Anzeige (kein endloses Log) -->
+      <div class="eventBox" id="eventBox">—</div>
     </section>
 
+    <!-- POWER PANEL -->
     <section class="panel hidden" id="powerPanel">
       <div class="panelHeader">
         <div class="panelTitle">Power-Spins</div>
@@ -95,7 +104,7 @@
         </div>
       </div>
 
-      <div class="footerRow">
+      <div class="resultBar">
         <div class="status" id="powerStatus">Power-Spins bereit.</div>
         <div class="winBox">
           <div class="winLabel">Power-Gewinn</div>
@@ -103,10 +112,9 @@
         </div>
       </div>
     </section>
-
   </main>
 
-  <!-- POWER-SPINS MODAL -->
+  <!-- POWER MODAL -->
   <div class="modalOverlay hidden" id="powerModalOverlay">
     <div class="modal">
       <div class="modalHeader">
@@ -116,16 +124,14 @@
       <div class="modalBody">
         <p id="powerModalText" class="modalText">—</p>
 
-        <div class="buyRow">
-          <label class="field">
-            <span>Power-Spins kaufen (Kosten = Einsatz pro Spin)</span>
-            <input type="range" min="1" max="1" value="1" id="powerBuyRange" />
-            <div class="rangeMeta">
-              <span id="powerBuySpins">1 Spin</span>
-              <span id="powerBuyCost">€0.00</span>
-            </div>
-          </label>
-        </div>
+        <label class="field">
+          <span>Power-Spins kaufen (Kosten = Einsatz pro Spin)</span>
+          <input type="range" min="1" max="1" value="1" id="powerBuyRange" />
+          <div class="rangeMeta">
+            <span id="powerBuySpins">1 Spin</span>
+            <span id="powerBuyCost">€0.00</span>
+          </div>
+        </label>
 
         <div class="modalActions">
           <button class="btn" id="takeWinBtn">Gewinn nehmen</button>
@@ -135,7 +141,7 @@
     </div>
   </div>
 
-  <!-- DAILY WHEEL MODAL -->
+  <!-- WHEEL MODAL -->
   <div class="modalOverlay hidden" id="wheelModalOverlay">
     <div class="modal">
       <div class="modalHeader">
@@ -161,7 +167,7 @@
     </div>
   </div>
 
-  <!-- ADMIN PANEL -->
+  <!-- ADMIN / BUILDER -->
   <div class="modalOverlay hidden" id="adminOverlay">
     <div class="modal wide">
       <div class="modalHeader">
@@ -190,8 +196,7 @@
             </div>
 
             <div class="smallNote">
-              Admin aktiv durch <b>STRG+ALT+#</b> (Passwort: 1403).<br/>
-              Builder erlaubt neue Slots ohne bestehende zu zerstören.
+              Admin aktiv durch <b>STRG+ALT+#</b> (Passwort: 1403).
             </div>
           </div>
 
@@ -219,15 +224,7 @@
               <button class="btn" id="builderExportSlotBtn">Slot Export</button>
               <button class="btn" id="builderImportSlotBtn">Slot Import</button>
             </div>
-
-            <div class="smallNote">
-              Tipp: Du kannst später einfach „hier die neue Slot“ schicken – dann fügen wir nur eine neue Config hinzu.
-            </div>
           </div>
-        </div>
-
-        <div class="hidden" id="importOverlayInline">
-          <!-- JS nutzt prompt/textarea direkt; bleibt für Erweiterungen -->
         </div>
       </div>
     </div>
