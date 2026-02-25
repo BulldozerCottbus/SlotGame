@@ -1,250 +1,238 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <title>Slot Studio (Custom Slots)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Multi Slot System</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <header class="topbar">
     <div class="brand">
-      <div class="logo" id="secretLogo">🎰</div>
-      <div>
-        <div class="title">Slot Studio</div>
-        <div class="subtitle">Mehrere Slots • Admin-Builder • Triple-Triple Chance Feature</div>
+      <div class="logoBadge">SLOTS</div>
+      <div class="brandText">
+        <div class="title">Multi Slot System</div>
+        <div class="sub">5×3 · 10 Linien · Lucky Pharaoh (Default)</div>
       </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab active" id="tabPlay">Play</button>
-      <button class="tab hidden" id="tabBuilder">Builder</button>
+    <div class="hud">
+      <div class="hudItem">
+        <div class="hudLabel">Balance</div>
+        <div class="hudValue" id="balance">€0.00</div>
+      </div>
+
+      <div class="hudItem">
+        <div class="hudLabel">Slot</div>
+        <select id="slotSelect" class="select"></select>
+      </div>
+
+      <div class="hudItem">
+        <div class="hudLabel">Einsatz</div>
+        <select id="betSelect" class="select"></select>
+      </div>
+
+      <div class="hudItem hudButtons">
+        <button id="spinBtn" class="btn primary">SPIN</button>
+        <button id="wheelBtn" class="btn">Daily Wheel</button>
+      </div>
+
+      <div class="hudItem hudSmall">
+        <div class="hint">
+          Admin: <span class="kbd">STRG</span> + <span class="kbd">ALT</span> + <span class="kbd">#</span>
+        </div>
+        <div class="hint2" id="wheelCooldownText">Wheel: bereit</div>
+      </div>
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="main">
 
-    <!-- ===================== PLAY ===================== -->
-    <section id="viewPlay" class="view">
-      <div class="panel">
-        <div class="panelHead">
-          <div class="row gap wrapRow">
-            <div class="slotName" id="slotName">—</div>
-            <select id="slotSelect" class="select"></select>
-            <span class="pill hidden" id="adminPill">ADMIN</span>
-          </div>
-          <div class="tiny">Demo/Arcade (kein Echtgeld)</div>
-        </div>
-
-        <div class="hud">
-          <div class="hudBox">
-            <div class="hudLabel">Credits</div>
-            <div class="hudValue" id="credits">0</div>
-          </div>
-          <div class="hudBox">
-            <div class="hudLabel">Bet / Linie</div>
-            <div class="hudValue row">
-              <button class="mini" id="betDown">–</button>
-              <div id="betPerLine">1</div>
-              <button class="mini" id="betUp">+</button>
-            </div>
-          </div>
-          <div class="hudBox">
-            <div class="hudLabel">Linien</div>
-            <div class="hudValue" id="lineCount">0</div>
-          </div>
-          <div class="hudBox">
-            <div class="hudLabel">Sounds</div>
-            <div class="hudValue row">
-              <button class="mini" id="soundToggle">ON</button>
-              <button class="mini ghost" id="resetCredits">Reset</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="reels" id="reels"></div>
-
-        <div class="controls">
-          <button class="btn primary" id="spinBtn">SPIN</button>
-          <button class="btn" id="autoBtn">AUTO: OFF</button>
-          <button class="btn hidden" id="simBtn">RTP Test (10k)</button>
-        </div>
-
-        <div class="msg" id="msg">Bereit.</div>
-        <div class="wins" id="wins"></div>
+    <section class="panel">
+      <div class="panelHeader">
+        <div class="panelTitle">Basisspiel</div>
+        <div class="panelMeta" id="slotMeta">—</div>
       </div>
+
+      <div class="gameArea">
+        <div id="baseBoard" class="board"></div>
+      </div>
+
+      <div class="footerRow">
+        <div class="status" id="statusText">Bereit.</div>
+        <div class="winBox">
+          <div class="winLabel">Letzter Gewinn</div>
+          <div class="winValue" id="lastWin">€0.00</div>
+        </div>
+      </div>
+
+      <div class="log" id="log"></div>
     </section>
 
-    <!-- ===================== BUILDER ===================== -->
-    <section id="viewBuilder" class="view hidden">
-      <div class="panel">
-        <div class="panelHead">
-          <div class="slotName">Builder</div>
-          <div class="tiny">Nur Admin: Slots verwalten, Symbole/Gewichte/Payouts/Linien/Features.</div>
+    <section class="panel hidden" id="powerPanel">
+      <div class="panelHeader">
+        <div class="panelTitle">Power-Spins</div>
+        <div class="panelMeta" id="powerMeta">—</div>
+      </div>
+
+      <div class="powerGrid">
+        <div class="miniBoardWrap">
+          <div class="miniLabel">Feld 1</div>
+          <div id="pBoard1" class="board mini"></div>
         </div>
+        <div class="miniBoardWrap">
+          <div class="miniLabel">Feld 2</div>
+          <div id="pBoard2" class="board mini"></div>
+        </div>
+        <div class="miniBoardWrap">
+          <div class="miniLabel">Feld 3</div>
+          <div id="pBoard3" class="board mini"></div>
+        </div>
+        <div class="miniBoardWrap">
+          <div class="miniLabel">Feld 4</div>
+          <div id="pBoard4" class="board mini"></div>
+        </div>
+      </div>
 
-        <div class="builderGrid">
-
-          <div class="card">
-            <div class="cardTitle">Slot Auswahl</div>
-            <label class="field">
-              <span>Slot</span>
-              <select id="bSlotSelect" class="select"></select>
-            </label>
-            <div class="row gap">
-              <button class="btn" id="newSlotBtn">Neuer Slot</button>
-              <button class="btn" id="dupSlotBtn">Duplizieren</button>
-              <button class="btn danger" id="delSlotBtn">Löschen</button>
-            </div>
-            <div class="hint">Tipp: Der “Triple-Triple Chance” Slot ist schon drin.</div>
-          </div>
-
-          <div class="card">
-            <div class="cardTitle">Slot Einstellungen</div>
-            <label class="field">
-              <span>Name</span>
-              <input id="bName" type="text" placeholder="Mein Slot" />
-            </label>
-            <label class="field">
-              <span>Start-Credits</span>
-              <input id="bStartCredits" type="number" min="0" step="1" />
-            </label>
-            <label class="field">
-              <span>Akzentfarbe (Hex)</span>
-              <input id="bAccent" type="text" placeholder="#00e5ff" />
-            </label>
-
-            <div class="divider"></div>
-
-            <label class="field">
-              <span>Reel Mode</span>
-              <select id="bReelMode" class="select">
-                <option value="independent">Independent (random pro Feld)</option>
-                <option value="stacked">Stacked (jede Walze = 1 Symbol, 3-fach gestapelt)</option>
-              </select>
-            </label>
-
-            <label class="field rowStart">
-              <input id="bTTEnabled" type="checkbox" />
-              <span>Triple-Triple Chance aktiv (Trigger: Vollbild)</span>
-            </label>
-
-            <div class="row gap">
-              <label class="field">
-                <span>Greens / Runde</span>
-                <input id="bTTGreens" type="number" min="1" max="20" step="1" />
-              </label>
-              <label class="field">
-                <span>Reds / Runde</span>
-                <input id="bTTReds" type="number" min="1" max="20" step="1" />
-              </label>
-              <label class="field">
-                <span>Max Runden</span>
-                <input id="bTTMaxRounds" type="number" min="0" max="99" step="1" />
-              </label>
-            </div>
-
-            <div class="hint">
-              “Vollbild” = 15 gleiche Symbole. Pro Grün bekommst du den Vollbild-Payout nochmal. Rot killt den Bonus.
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="cardTitle">Linien (Paylines)</div>
-            <div class="lines" id="bLines"></div>
-            <div class="hint">Gewinne zählen pro Linie (links → rechts).</div>
-          </div>
-
-          <div class="card wide">
-            <div class="cardTitle row space">
-              <span>Symbole & Auszahlungen</span>
-              <button class="mini" id="addSymbol">+ Symbol</button>
-            </div>
-
-            <div class="tableWrap">
-              <table class="table" id="symbolTable">
-                <thead>
-                  <tr>
-                    <th>Icon (Emoji oder URL)</th>
-                    <th>Name</th>
-                    <th>Gewicht</th>
-                    <th>Payout 3</th>
-                    <th>Payout 4</th>
-                    <th>Payout 5</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="symbolTbody"></tbody>
-              </table>
-            </div>
-
-            <div class="hint">
-              Gewicht = Häufigkeit. Payouts sind “x Bet/Linie”.
-            </div>
-          </div>
-
-          <div class="card wide">
-            <div class="cardTitle">Export / Import (JSON)</div>
-            <textarea id="jsonBox" class="json" spellcheck="false"></textarea>
-            <div class="row gap">
-              <button class="btn" id="exportBtn">Export JSON</button>
-              <button class="btn" id="importBtn">Import JSON</button>
-              <button class="btn primary" id="saveBtn">Speichern & Anwenden</button>
-            </div>
-          </div>
-
+      <div class="footerRow">
+        <div class="status" id="powerStatus">Power-Spins bereit.</div>
+        <div class="winBox">
+          <div class="winLabel">Power-Gewinn</div>
+          <div class="winValue" id="powerWin">€0.00</div>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- ===================== ADMIN MODAL ===================== -->
-  <div id="adminModal" class="modal hidden">
-    <div class="modalCard">
-      <div class="modalTitle">Admin Unlock</div>
-      <div class="tiny">Öffnen: <b>Ctrl + Alt + #</b> (oder Ctrl+Alt+3)</div>
-
-      <label class="field">
-        <span>Admin Code</span>
-        <input id="adminCode" type="password" placeholder="Code eingeben…" />
-      </label>
-
-      <div class="row gap">
-        <button class="btn primary" id="adminUnlockBtn">Unlock</button>
-        <button class="btn danger" id="adminLogoutBtn">Logout</button>
-        <button class="btn" id="adminCloseBtn">Close</button>
+  <!-- POWER-SPINS MODAL -->
+  <div class="modalOverlay hidden" id="powerModalOverlay">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="modalTitle">Power-Spins verfügbar</div>
+        <button class="iconBtn" id="closePowerModal" aria-label="close">✕</button>
       </div>
+      <div class="modalBody">
+        <p id="powerModalText" class="modalText">—</p>
 
-      <div class="tiny" id="adminStatus"></div>
+        <div class="buyRow">
+          <label class="field">
+            <span>Power-Spins kaufen (Kosten = Einsatz pro Spin)</span>
+            <input type="range" min="1" max="1" value="1" id="powerBuyRange" />
+            <div class="rangeMeta">
+              <span id="powerBuySpins">1 Spin</span>
+              <span id="powerBuyCost">€0.00</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="modalActions">
+          <button class="btn" id="takeWinBtn">Gewinn nehmen</button>
+          <button class="btn primary" id="buyPowerBtn">In Power-Spins investieren</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ===================== TRIPLE-TRIPLE CHANCE MODAL ===================== -->
-  <div id="ttcModal" class="modal hidden">
-    <div class="modalCard">
-      <div class="modalTitle">Triple-Triple Chance</div>
-      <div class="tiny">Grün = Vollbild-Payout nochmal. Rot = Bonus weg & Ende.</div>
-
-      <div class="ttcStats">
-        <div>Vollbild-Payout: <b id="ttcBase">0</b></div>
-        <div>Bonus gesammelt: <b id="ttcPending">0</b></div>
-        <div>Greens: <b id="ttcGreens">0</b></div>
-        <div>Runde: <b id="ttcRound">0</b></div>
+  <!-- DAILY WHEEL MODAL -->
+  <div class="modalOverlay hidden" id="wheelModalOverlay">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="modalTitle">Daily Wheel (alle 24 Stunden)</div>
+        <button class="iconBtn" id="closeWheelModal" aria-label="close">✕</button>
       </div>
+      <div class="modalBody">
+        <p class="modalText" id="wheelInfo">Dreh am Rad und gewinne €10 bis €100.</p>
 
-      <div class="ttcBoard" id="ttcBoard"></div>
-      <div class="ttcLamps" id="ttcLamps"></div>
+        <div class="wheelWrap">
+          <div class="wheel" id="wheel">
+            <div class="wheelCenter">€</div>
+          </div>
+          <div class="wheelPointer" aria-hidden="true"></div>
+        </div>
 
-      <div class="row gap" style="margin-top:12px;">
-        <button class="btn primary" id="ttcSpinBtn">SPIN-OFF</button>
-        <button class="btn" id="ttcCollectBtn">COLLECT</button>
+        <div class="modalActions">
+          <button class="btn primary" id="spinWheelBtn">Wheel drehen</button>
+        </div>
+
+        <div class="smallNote" id="wheelReadyText">—</div>
       </div>
-      <div class="msg" id="ttcMsg" style="margin-top:10px;">—</div>
     </div>
   </div>
 
-  <script src="slot.js"></script>
+  <!-- ADMIN PANEL -->
+  <div class="modalOverlay hidden" id="adminOverlay">
+    <div class="modal wide">
+      <div class="modalHeader">
+        <div class="modalTitle">Admin / Builder</div>
+        <button class="iconBtn" id="closeAdmin" aria-label="close">✕</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="adminGrid">
+          <div class="cardBox">
+            <div class="cardTitle">Admin Aktionen</div>
+
+            <label class="field">
+              <span>Balance setzen (€)</span>
+              <input id="adminBalanceInput" type="number" min="0" step="0.01" />
+            </label>
+
+            <div class="row">
+              <button class="btn" id="adminSetBalanceBtn">Balance übernehmen</button>
+              <button class="btn" id="adminResetWheelBtn">Wheel Cooldown reset</button>
+            </div>
+
+            <div class="row">
+              <button class="btn" id="adminExportDataBtn">Export Save (JSON)</button>
+              <button class="btn danger" id="adminResetAllBtn">ALLES zurücksetzen</button>
+            </div>
+
+            <div class="smallNote">
+              Admin aktiv durch <b>STRG+ALT+#</b> (Passwort: 1403).<br/>
+              Builder erlaubt neue Slots ohne bestehende zu zerstören.
+            </div>
+          </div>
+
+          <div class="cardBox">
+            <div class="cardTitle">Builder Modus (Slots)</div>
+
+            <div class="row">
+              <button class="btn" id="builderNewBtn">Neuer Slot</button>
+              <button class="btn" id="builderCloneBtn">Slot klonen</button>
+              <button class="btn danger" id="builderDeleteBtn">Custom Slot löschen</button>
+            </div>
+
+            <label class="field">
+              <span>Slot auswählen</span>
+              <select id="builderSlotSelect" class="select"></select>
+            </label>
+
+            <label class="field">
+              <span>Slot Config (JSON)</span>
+              <textarea id="builderJson" class="textarea" rows="16" spellcheck="false"></textarea>
+            </label>
+
+            <div class="row">
+              <button class="btn primary" id="builderSaveBtn">Validieren & Speichern</button>
+              <button class="btn" id="builderExportSlotBtn">Slot Export</button>
+              <button class="btn" id="builderImportSlotBtn">Slot Import</button>
+            </div>
+
+            <div class="smallNote">
+              Tipp: Du kannst später einfach „hier die neue Slot“ schicken – dann fügen wir nur eine neue Config hinzu.
+            </div>
+          </div>
+        </div>
+
+        <div class="hidden" id="importOverlayInline">
+          <!-- JS nutzt prompt/textarea direkt; bleibt für Erweiterungen -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
