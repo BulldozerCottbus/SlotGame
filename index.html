@@ -10,16 +10,16 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="logo">🎰</div>
+      <div class="logo" id="secretLogo">🎰</div>
       <div>
         <div class="title">Slot Studio</div>
-        <div class="subtitle">Baue deinen eigenen Slot & spiele ihn direkt (mit Sounds)</div>
+        <div class="subtitle">Mehrere Slots • Admin-Builder • Triple-Triple Chance Feature</div>
       </div>
     </div>
 
     <div class="tabs">
       <button class="tab active" id="tabPlay">Play</button>
-      <button class="tab" id="tabBuilder">Builder</button>
+      <button class="tab hidden" id="tabBuilder">Builder</button>
     </div>
   </header>
 
@@ -29,7 +29,11 @@
     <section id="viewPlay" class="view">
       <div class="panel">
         <div class="panelHead">
-          <div class="slotName" id="slotName">—</div>
+          <div class="row gap wrapRow">
+            <div class="slotName" id="slotName">—</div>
+            <select id="slotSelect" class="select"></select>
+            <span class="pill hidden" id="adminPill">ADMIN</span>
+          </div>
           <div class="tiny">Demo/Arcade (kein Echtgeld)</div>
         </div>
 
@@ -64,7 +68,7 @@
         <div class="controls">
           <button class="btn primary" id="spinBtn">SPIN</button>
           <button class="btn" id="autoBtn">AUTO: OFF</button>
-          <button class="btn" id="simBtn">RTP Test (10k)</button>
+          <button class="btn hidden" id="simBtn">RTP Test (10k)</button>
         </div>
 
         <div class="msg" id="msg">Bereit.</div>
@@ -77,10 +81,24 @@
       <div class="panel">
         <div class="panelHead">
           <div class="slotName">Builder</div>
-          <div class="tiny">Definiere Symbole, Gewichte, Auszahlungen & Linien. Speichern → direkt im Play nutzbar.</div>
+          <div class="tiny">Nur Admin: Slots verwalten, Symbole/Gewichte/Payouts/Linien/Features.</div>
         </div>
 
         <div class="builderGrid">
+
+          <div class="card">
+            <div class="cardTitle">Slot Auswahl</div>
+            <label class="field">
+              <span>Slot</span>
+              <select id="bSlotSelect" class="select"></select>
+            </label>
+            <div class="row gap">
+              <button class="btn" id="newSlotBtn">Neuer Slot</button>
+              <button class="btn" id="dupSlotBtn">Duplizieren</button>
+              <button class="btn danger" id="delSlotBtn">Löschen</button>
+            </div>
+            <div class="hint">Tipp: Der “Triple-Triple Chance” Slot ist schon drin.</div>
+          </div>
 
           <div class="card">
             <div class="cardTitle">Slot Einstellungen</div>
@@ -96,15 +114,46 @@
               <span>Akzentfarbe (Hex)</span>
               <input id="bAccent" type="text" placeholder="#00e5ff" />
             </label>
+
+            <div class="divider"></div>
+
+            <label class="field">
+              <span>Reel Mode</span>
+              <select id="bReelMode" class="select">
+                <option value="independent">Independent (random pro Feld)</option>
+                <option value="stacked">Stacked (jede Walze = 1 Symbol, 3-fach gestapelt)</option>
+              </select>
+            </label>
+
+            <label class="field rowStart">
+              <input id="bTTEnabled" type="checkbox" />
+              <span>Triple-Triple Chance aktiv (Trigger: Vollbild)</span>
+            </label>
+
+            <div class="row gap">
+              <label class="field">
+                <span>Greens / Runde</span>
+                <input id="bTTGreens" type="number" min="1" max="20" step="1" />
+              </label>
+              <label class="field">
+                <span>Reds / Runde</span>
+                <input id="bTTReds" type="number" min="1" max="20" step="1" />
+              </label>
+              <label class="field">
+                <span>Max Runden</span>
+                <input id="bTTMaxRounds" type="number" min="0" max="99" step="1" />
+              </label>
+            </div>
+
             <div class="hint">
-              Tipp: Akzentfarbe steuert den “Arcade”-Glow.
+              “Vollbild” = 15 gleiche Symbole. Pro Grün bekommst du den Vollbild-Payout nochmal. Rot killt den Bonus.
             </div>
           </div>
 
           <div class="card">
             <div class="cardTitle">Linien (Paylines)</div>
             <div class="lines" id="bLines"></div>
-            <div class="hint">Je mehr Linien, desto “Merkuriger”. Gewinne zählen pro Linie (links → rechts).</div>
+            <div class="hint">Gewinne zählen pro Linie (links → rechts).</div>
           </div>
 
           <div class="card wide">
@@ -131,8 +180,7 @@
             </div>
 
             <div class="hint">
-              Gewicht = wie häufig das Symbol kommt (höher = häufiger). Payouts sind “x Bet/Linie”.
-              Beispiel: 3x Kirsche = 5 → Gewinn = 5 * Bet/Linie.
+              Gewicht = Häufigkeit. Payouts sind “x Bet/Linie”.
             </div>
           </div>
 
@@ -144,9 +192,6 @@
               <button class="btn" id="importBtn">Import JSON</button>
               <button class="btn primary" id="saveBtn">Speichern & Anwenden</button>
             </div>
-            <div class="hint">
-              Damit kannst du dir beliebig viele Slots speichern/teilen.
-            </div>
           </div>
 
         </div>
@@ -154,6 +199,51 @@
     </section>
 
   </main>
+
+  <!-- ===================== ADMIN MODAL ===================== -->
+  <div id="adminModal" class="modal hidden">
+    <div class="modalCard">
+      <div class="modalTitle">Admin Unlock</div>
+      <div class="tiny">Öffnen: <b>Ctrl + Alt + #</b> (oder Ctrl+Alt+3)</div>
+
+      <label class="field">
+        <span>Admin Code</span>
+        <input id="adminCode" type="password" placeholder="Code eingeben…" />
+      </label>
+
+      <div class="row gap">
+        <button class="btn primary" id="adminUnlockBtn">Unlock</button>
+        <button class="btn danger" id="adminLogoutBtn">Logout</button>
+        <button class="btn" id="adminCloseBtn">Close</button>
+      </div>
+
+      <div class="tiny" id="adminStatus"></div>
+    </div>
+  </div>
+
+  <!-- ===================== TRIPLE-TRIPLE CHANCE MODAL ===================== -->
+  <div id="ttcModal" class="modal hidden">
+    <div class="modalCard">
+      <div class="modalTitle">Triple-Triple Chance</div>
+      <div class="tiny">Grün = Vollbild-Payout nochmal. Rot = Bonus weg & Ende.</div>
+
+      <div class="ttcStats">
+        <div>Vollbild-Payout: <b id="ttcBase">0</b></div>
+        <div>Bonus gesammelt: <b id="ttcPending">0</b></div>
+        <div>Greens: <b id="ttcGreens">0</b></div>
+        <div>Runde: <b id="ttcRound">0</b></div>
+      </div>
+
+      <div class="ttcBoard" id="ttcBoard"></div>
+      <div class="ttcLamps" id="ttcLamps"></div>
+
+      <div class="row gap" style="margin-top:12px;">
+        <button class="btn primary" id="ttcSpinBtn">SPIN-OFF</button>
+        <button class="btn" id="ttcCollectBtn">COLLECT</button>
+      </div>
+      <div class="msg" id="ttcMsg" style="margin-top:10px;">—</div>
+    </div>
+  </div>
 
   <script src="slot.js"></script>
 </body>
